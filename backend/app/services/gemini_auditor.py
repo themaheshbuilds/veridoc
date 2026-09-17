@@ -72,11 +72,12 @@ class GeminiAuditorService:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
 
-            # Load image from bytes
+            # Load image from bytes and optimize resolution for high-speed analysis
             img = Image.open(io.BytesIO(file_bytes))
-            # Convert RGBA / CMYK to RGB if necessary
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
+            # Downscale large images to max 1024px while retaining forensic clarity for <2s inference
+            img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
 
             prompt = f"""You are the VERIDOC Forensic Document Examination Engine acting under Section 65B Indian Evidence Act standards.
 Examine this document image for authenticity, physical tampering, digital splicing, and alignment with extracted demographic text.
@@ -98,7 +99,8 @@ Return a brief, professional bulleted summary of your findings (maximum 3 concis
 Keep each bullet point under 120 characters for dashboard display.
 """
 
-            candidate_models = ["gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]
+            # Primary fast multimodal models
+            candidate_models = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
             response = None
 
             for m_name in candidate_models:
