@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Official Statutory QR &amp; PKI Reader — VERIDOC</title>
+  <meta name="description" content="Direct cryptographic decoding and mathematical signature validation for UIDAI Aadhaar Secure QR codes (V1/V2/V3 &amp; XML) and Income Tax PAN matrices. Section 65B Indian Evidence Act compliant.">
+
+  <!-- Terra Organic Typography: Literata (Serif Headline), Nunito Sans (Body), JetBrains Mono (Code/Hashes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..800;1,7..72,400..800&family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..800&display=swap" rel="stylesheet">
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles-v2-additions.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    
+    <!-- Top Menu Bar: VERIDOC and page links names -->
+    <header class="terra-header">
+      
+      <!-- Brand: Just VERIDOC -->
+      <a href="/" class="brand-section" id="btn-brand-home" title="VERIDOC Home" style="text-decoration: none; gap: 0.6rem;">
+        <div class="brand-shield-icon" style="width: 38px; height: 38px;">
+          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 22px;">verified_user</span>
+        </div>
+        <span class="brand-text-logo" style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-primary);">VERIDOC</span>
+      </a>
+
+      <!-- 3-Dots Menu Button (Mobile & Tablet) -->
+      <button class="mobile-dots-btn" id="btn-mobile-menu" aria-label="Open Navigation Menu" title="Menu">
+        <span class="material-symbols-outlined">more_vert</span>
+      </button>
+
+      <!-- Page Links Names -->
+      <nav class="terra-nav" aria-label="Main Navigation">
+        <a href="/" class="terra-nav-btn" id="nav-tab-home">
+          <span class="material-symbols-outlined">dashboard</span>
+          <span>Home</span>
+        </a>
+        <a href="/verifydocuments" class="terra-nav-btn" id="nav-tab-verify">
+          <span class="material-symbols-outlined">document_scanner</span>
+          <span>Verify Documents</span>
+        </a>
+        <a href="/qr-reader" class="terra-nav-btn active" id="nav-tab-qr">
+          <span class="material-symbols-outlined">qr_code_scanner</span>
+          <span>QR Reader</span>
+        </a>
+        <a href="/verified-documents" class="terra-nav-btn" id="nav-tab-verified">
+          <span class="material-symbols-outlined">bar_chart</span>
+          <span>Verified Documents</span>
+        </a>
+        <a href="/api-access" class="terra-nav-btn" id="nav-tab-api">
+          <span class="material-symbols-outlined">terminal</span>
+          <span>API Access</span>
+        </a>
+        <a href="/verification-history" class="terra-nav-btn" id="nav-tab-history">
+          <span class="material-symbols-outlined">manage_history</span>
+          <span>History</span>
+        </a>
+      </nav>
+
+    </header>
+
+    <!-- Main Application View Area -->
+    <main class="terra-main">
+
+      <!-- ====================================================================
+           DEDICATED PAGE: OFFICIAL STATUTORY QR & PKI READER
+           ==================================================================== -->
+      <section class="view-section active" id="view-qr">
+        
+        <!-- Page Back Bar -->
+        <div class="page-back-bar">
+          <a href="/" class="btn-terra-secondary" style="font-size: 12px; padding: 0.35rem 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span>
+            <span>Back to Home</span>
+          </a>
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">STATION: OFFICIAL STATUTORY QR &amp; PKI READER</span>
+        </div>
+
+        <div class="section-headline-bar" style="margin-top: 0;">
+          <div>
+            <h2 class="section-main-title">
+              <span class="material-symbols-outlined">qr_code_scanner</span>
+              <span>Official Statutory QR &amp; PKI Reader</span>
+            </h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 3px;">
+              Direct cryptographic decoding and mathematical signature validation for UIDAI Aadhaar Secure QR codes (V1/V2/V3 &amp; XML) and Income Tax PAN matrices. Section 65B Indian Evidence Act compliant.
+            </p>
+          </div>
+          <span class="section-spec-count" id="qr-station-badge">AUA DIRECT DECRYPTOR</span>
+        </div>
+
+        <!-- 1. Live Statutory Registry Status Tiles -->
+        <div class="chamber-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 style="font-family: var(--font-headline); font-size: 1.15rem; color: var(--text-primary);">
+              Statutory Identity Verification Gateways
+            </h3>
+            <button class="btn-terra-secondary" id="btn-refresh-registries" style="padding: 0.35rem 0.75rem; font-size: 12px;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">sync</span>
+              <span>Refresh Status</span>
+            </button>
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 1rem;">
+            Direct cryptographic verification channels complying with Aadhaar Act 2016 and Section 65B Indian Evidence Act.
+          </p>
+
+          <div class="registry-status-grid" id="registry-tiles-container">
+            <!-- Rendered dynamically by app.js -->
+            <div class="registry-tile">
+              <div class="registry-tile-header">
+                <strong style="font-size: 13px;">UIDAI Aadhaar Gateway</strong>
+                <span class="terra-badge verified">ONLINE</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Secure QR V2/V3 &bull; RSA-2048 HSM</div>
+              <div style="font-size: 11px; color: var(--primary); font-weight: 700; margin-top: 4px;">AUA: AUA-IND-BORDER-084</div>
+            </div>
+
+            <div class="registry-tile">
+              <div class="registry-tile-header">
+                <strong style="font-size: 13px;">NSDL / CBDT PAN Gateway</strong>
+                <span class="terra-badge verified">ONLINE</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Enhanced QR Matrix &bull; CBDT v2</div>
+              <div style="font-size: 11px; color: var(--primary); font-weight: 700; margin-top: 4px;">Direct Registry Query Active</div>
+            </div>
+
+            <div class="registry-tile">
+              <div class="registry-tile-header">
+                <strong style="font-size: 13px;">MoRTH Sarathi DL</strong>
+                <span class="terra-badge verified">ONLINE</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary);">National Register &bull; Form 7</div>
+              <div style="font-size: 11px; color: var(--primary); font-weight: 700; margin-top: 4px;">Smart Card DL Verified</div>
+            </div>
+
+            <div class="registry-tile">
+              <div class="registry-tile-header">
+                <strong style="font-size: 13px;">MEA / ICAO PKD</strong>
+                <span class="terra-badge verified">ONLINE</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Doc 9303 &bull; CSCA Directory</div>
+              <div style="font-size: 11px; color: var(--primary); font-weight: 700; margin-top: 4px;">Passport Seva Linked</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Official Aadhaar & PAN QR Scanner Station -->
+        <div class="chamber-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <h3 style="font-family: var(--font-headline); font-size: 1.15rem; color: var(--text-primary);">
+                Official QR Scanner Station (Aadhaar &amp; PAN)
+              </h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Scan or drop an official Aadhaar Secure QR or Income Tax PAN QR code for immediate cryptographic validation.
+              </p>
+            </div>
+            
+            <!-- Type Toggle -->
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="specimen-pill-btn active" id="btn-qr-mode-aadhaar" type="button">UIDAI Aadhaar QR</button>
+              <button class="specimen-pill-btn" id="btn-qr-mode-pan" type="button">Income Tax PAN QR</button>
+            </div>
+          </div>
+
+          <!-- Scanning Guidance Tip Box -->
+          <div style="background: rgba(74, 124, 89, 0.08); border: 1px solid rgba(74, 124, 89, 0.25); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 12px; color: var(--text-primary); display: flex; align-items: flex-start; gap: 0.65rem;">
+            <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px; flex-shrink: 0; margin-top: 1px;">verified</span>
+            <div style="line-height: 1.5;">
+              <strong>High-Precision Aadhaar &amp; PAN Scanning:</strong>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                &bull; <strong>Close-up crop or Camera:</strong> Aadhaar Secure QRs contain dense 2048-bit digital signatures. Hold the card steady 6–10 inches from the camera, or upload a clear, high-resolution crop of the QR code.<br>
+                &bull; <strong>Full Document:</strong> If you upload a photo of your full card, our engine will automatically verify your authentic attested demographic data via high-precision OCR and Verhoeff checks. For full multi-modal tampering &amp; optical forensics, you can also use the <a href="/verifydocuments" style="color: var(--primary); font-weight: 700; text-decoration: underline;">Document Verification Station</a>.
+              </div>
+            </div>
+          </div>
+
+          <!-- Ingress Channels Tab Navigation -->
+          <div class="qr-tab-nav">
+            <button class="qr-tab-btn active" id="btn-qr-tab-camera" type="button">
+              <span class="material-symbols-outlined" style="font-size: 16px;">photo_camera</span>
+              <span>Live Camera Scanner</span>
+            </button>
+            <button class="qr-tab-btn" id="btn-qr-tab-upload" type="button">
+              <span class="material-symbols-outlined" style="font-size: 16px;">upload_file</span>
+              <span>Upload / Drop Image</span>
+            </button>
+            <button class="qr-tab-btn" id="btn-qr-tab-text" type="button">
+              <span class="material-symbols-outlined" style="font-size: 16px;">text_fields</span>
+              <span>Raw Payload / XML String</span>
+            </button>
+          </div>
+
+          <!-- Channel 1: Live Camera Viewfinder -->
+          <div id="qr-camera-channel" style="display: block;">
+            <div class="camera-viewport-container" id="qr-camera-container">
+              <video id="qr-camera-video" class="camera-video-feed" playsinline autoplay muted></video>
+              <div class="camera-reticle-overlay">
+                <span class="reticle-corner-tr"></span>
+                <span class="reticle-corner-bl"></span>
+              </div>
+              <div class="camera-laser-scan-line"></div>
+              <div class="camera-status-pill">
+                <span class="camera-status-dot" id="camera-status-dot"></span>
+                <span id="camera-status-text">Camera Inactive &bull; Click Start Camera</span>
+              </div>
+            </div>
+            <div class="camera-controls-bar">
+              <button class="btn-terra-primary" id="btn-camera-start" type="button" style="padding: 0.5rem 1.2rem; font-size: 12px;">
+                <span class="material-symbols-outlined" style="font-size: 18px;">videocam</span>
+                <span>Start Live Camera</span>
+              </button>
+              <button class="btn-terra-primary" id="btn-camera-capture" type="button" style="padding: 0.5rem 1.2rem; font-size: 12px; display: none;">
+                <span class="material-symbols-outlined" style="font-size: 18px;">camera</span>
+                <span>Capture &amp; Verify QR</span>
+              </button>
+              <button class="btn-terra-secondary" id="btn-camera-flip" type="button" style="padding: 0.5rem 1rem; font-size: 12px; display: none;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">flip_camera_ios</span>
+                <span>Switch Camera</span>
+              </button>
+              <button class="btn-terra-secondary" id="btn-camera-stop" type="button" style="padding: 0.5rem 1rem; font-size: 12px; display: none;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">videocam_off</span>
+                <span>Stop Camera</span>
+              </button>
+            </div>
+            <canvas id="qr-camera-canvas" style="display: none;"></canvas>
+          </div>
+
+          <!-- Channel 2: Upload / Dropzone -->
+          <div id="qr-upload-channel" style="display: none;">
+            <div class="dropzone-terra" id="official-qr-dropzone" style="padding: 2rem; text-align: center;">
+              <input type="file" id="official-qr-file-input" accept="image/*" style="display: none;">
+              <span class="material-symbols-outlined" style="font-size: 36px; color: var(--primary);">qr_code_scanner</span>
+              <p style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 6px;">
+                Drop Aadhaar / PAN QR code image here, or <span style="color: var(--primary); text-decoration: underline; cursor: pointer;">browse</span>
+              </p>
+              <p style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                Supports high-resolution camera crops, card scans, PNG, JPG, WEBP
+              </p>
+            </div>
+          </div>
+
+          <!-- Channel 3: Raw Payload / XML Text -->
+          <div id="qr-text-channel" style="display: none;">
+            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">
+              Paste Raw QR String / XML / Compressed BigInteger Stream:
+            </label>
+            <textarea id="official-qr-text-input" class="terra-input" rows="5" style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;" placeholder="Paste decrypted Aadhaar XML or PAN matrix payload..."></textarea>
+          </div>
+
+          <!-- Presets & Actions Row -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn-terra-secondary" id="btn-load-sample-aadhaar-qr" style="font-size: 12px; padding: 0.4rem 0.85rem;" type="button">
+                Load Sample Aadhaar QR (XML)
+              </button>
+              <button class="btn-terra-secondary" id="btn-load-sample-aadhaar-v2-qr" style="font-size: 12px; padding: 0.4rem 0.85rem;" type="button">
+                Load Sample Aadhaar Secure QR (V2/V3)
+              </button>
+              <button class="btn-terra-secondary" id="btn-load-sample-pan-qr" style="font-size: 12px; padding: 0.4rem 0.85rem;" type="button">
+                Load Sample PAN QR
+              </button>
+            </div>
+
+            <button class="btn-terra-primary" id="btn-run-official-qr-scan" style="padding: 0.65rem 1.6rem;">
+              <span class="material-symbols-outlined" style="font-size: 18px;">verified</span>
+              <span id="btn-official-scan-label">Verify against UIDAI Gateway</span>
+            </button>
+          </div>
+
+          <!-- Official Decoded Result Card -->
+          <div id="official-qr-result-box" class="official-result-card" style="display: none;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="terra-badge verified" id="official-result-status-badge">OFFICIAL VERIFIED</span>
+                <h4 style="font-family: var(--font-headline); font-size: 1.15rem; color: var(--text-primary); margin-top: 4px;" id="official-result-authority">
+                  Unique Identification Authority of India (UIDAI)
+                </h4>
+                <p style="font-size: 12px; color: var(--text-secondary);" id="official-result-details">
+                  2048-bit digital signature mathematically validated using UIDAI public key certificate.
+                </p>
+              </div>
+              <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="official-result-timestamp"></span>
+            </div>
+
+            <div class="official-field-grid" id="official-result-fields">
+              <!-- Rendered dynamically by app.js -->
+            </div>
+
+            <!-- Collapsible Raw Decoded Payload -->
+            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-subtle);">
+              <button class="btn-terra-secondary" id="btn-toggle-raw-qr-payload" type="button" style="font-size: 11px; padding: 0.3rem 0.75rem;">
+                <span class="material-symbols-outlined" style="font-size: 14px;">code</span>
+                <span>Toggle Raw Decrypted Payload</span>
+              </button>
+              <pre id="qr-raw-payload-pre" class="qr-raw-payload-viewer" style="display: none;"></pre>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- SECTION 65B EVIDENCE MODAL -->
+    <div class="modal-scrim-bg" id="modal-cert-scrim">
+      <div class="cert-paper-sheet">
+        <div class="cert-guilloche-frame">
+          <div class="cert-wax-seal">
+            VERIDOC<br>SEC 65B<br>EVIDENCE
+          </div>
+
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="font-family: var(--font-headline); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--primary); text-transform: uppercase;">
+              Government of India &bull; Electronic Records Admissibility
+            </div>
+            <h2 style="font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 4px 0;">
+              Certificate of Electronic Evidence
+            </h2>
+            <p style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">
+              Issued Under Section 65B(4) of the Indian Evidence Act, 1872
+            </p>
+          </div>
+
+          <div style="font-size: 13px; line-height: 1.6; color: var(--text-primary); display: flex; flex-direction: column; gap: 0.85rem;">
+            <p>
+              This is to certify that the electronic record identified below was generated, processed, and cryptographically verified by the <strong>VERIDOC Document Verification Engine</strong> under continuous automated examination without manual modification of raw pixel data.
+            </p>
+
+            <div style="background: var(--surface-container-low); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; font-size: 12px; display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem;">
+              <strong>Session ID:</strong> <span id="cert-session-id" style="font-family: var(--font-mono); color: var(--primary);">—</span>
+              <strong>Document Category:</strong> <span id="cert-doc-type">—</span>
+              <strong>Verification Verdict:</strong> <span id="cert-verdict" style="font-weight: 700;">—</span>
+              <strong>Risk Score:</strong> <span id="cert-risk-score">—</span>
+              <strong>Timestamp (UTC):</strong> <span id="cert-timestamp" style="font-family: var(--font-mono);">—</span>
+              <strong>SHA-256 Digest:</strong> <span id="cert-hash" style="font-family: var(--font-mono); font-size: 10px; word-break: break-all; color: var(--primary);">—</span>
+              <strong>Issuing Mechanism:</strong> <span>Statutory PKI &amp; Cryptographic Verification</span>
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-secondary);">
+              I hereby declare that the electronic optical inspection engine was functioning properly at all material times and that the cryptographic signature above affirms the integrity and authenticity of this record.
+            </p>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn-terra-secondary" onclick="window.print()">
+              <span class="material-symbols-outlined">print</span>
+              <span>Print Certificate</span>
+            </button>
+            <button class="btn-terra-primary" onclick="closeCertModal()" style="width: auto; padding: 0.6rem 1.5rem;">
+              <span>Dismiss</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

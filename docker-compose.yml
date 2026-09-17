@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  veridoc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: veridoc:latest
+    container_name: veridoc-forensics-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - OFFLINE_SANDBOX_MODE=true
+      - API_V1_STR=/api/v1
+      - PROJECT_NAME=VERIDOC Sovereign Engine
+    volumes:
+      - ./veridoc.db:/app/veridoc.db
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

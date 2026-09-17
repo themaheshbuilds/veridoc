@@ -1,0 +1,135 @@
+
+
+/* ==========================================================================
+   VERIDOC v2.0 -- Sovereign Forensics Modernization Additions
+   ========================================================================== */
+
+
+/* Live Execution Timer */
+.execution-timer {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--primary);
+  background: rgba(74,124,89,0.08); border: 1px solid rgba(74,124,89,0.2);
+  border-radius: var(--radius-full); padding: 0.3rem 0.8rem; min-width: 140px; transition: all 0.3s ease;
+}
+.execution-timer.running {
+  color: var(--warning); border-color: rgba(217,115,13,0.3); background: rgba(217,115,13,0.08);
+  animation: timer-blink 0.8s ease-in-out infinite;
+}
+.execution-timer.done  { color: var(--success); border-color: rgba(43,138,62,0.3); background: rgba(43,138,62,0.08); }
+.execution-timer.error { color: var(--error);   border-color: rgba(184,50,48,0.3); background: rgba(184,50,48,0.08); }
+@keyframes timer-blink { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+/* 3-Column Forensic Results Display */
+.results-triple-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+@media (max-width:1100px) { .results-triple-col { grid-template-columns:1fr 1fr; } }
+@media (max-width:640px)  { .results-triple-col { grid-template-columns:1fr; } }
+
+.results-col-card {
+  background: var(--surface-lowest); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column;
+}
+.results-col-header {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.85rem;
+  background: var(--surface-container); border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-secondary); flex-shrink: 0;
+}
+.results-col-body { flex: 1; position: relative; min-height: 220px; overflow: hidden; }
+.doc-preview-canvas { width:100%; height:100%; object-fit:contain; background:#1a1a1a; display:block; }
+.ela-heatmap-img    { width:100%; height:100%; object-fit:contain; background:#0d0d0d; display:block; }
+.ela-overlay-label {
+  position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.72); color:#ff4444;
+  font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; font-family:var(--font-mono);
+}
+.ela-score-badge {
+  position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.72); color:#fff;
+  font-size:11px; font-weight:700; padding:4px 10px; border-radius:4px; font-family:var(--font-mono);
+}
+.ela-score-badge.suspicious { color:#ff4444; }
+.ela-score-badge.clean      { color:#44ff88; }
+
+.results-json-scroll {
+  padding: 0.75rem; overflow-y: auto; max-height: 340px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--text-primary);
+}
+.checksum-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.5rem; border-radius: var(--radius-xs); font-size: 10px; font-weight: 700; margin-top: 0.25rem;
+}
+.checksum-badge.pass { background:var(--success-bg); color:var(--success); border:1px solid var(--success-border); }
+.checksum-badge.fail { background:var(--error-bg);   color:var(--error);   border:1px solid var(--error-border); }
+.checksum-badge.na   { background:var(--surface-container); color:var(--text-muted); border:1px solid var(--border-subtle); }
+
+.api-setu-badge {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.25rem 0.6rem; border-radius: var(--radius-xs); font-size: 10px; font-weight: 700; margin-top: 0.5rem;
+}
+.api-setu-badge.verified { background:rgba(43,138,62,0.1); color:var(--success); border:1px solid var(--success-border); }
+.api-setu-badge.sandbox  { background:rgba(112,92,48,0.1); color:var(--tertiary); border:1px solid rgba(112,92,48,0.25); }
+.api-setu-badge.offline  { background:var(--surface-container); color:var(--text-muted); border:1px solid var(--border-subtle); }
+
+/* Frankenstein Forgery Alert */
+.frankenstein-alert {
+  display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.85rem 1rem;
+  background: linear-gradient(135deg,rgba(184,50,48,0.08),rgba(184,50,48,0.04));
+  border: 1px solid rgba(184,50,48,0.35); border-left: 4px solid var(--error);
+  border-radius: var(--radius-sm); margin-top: 0.75rem;
+  animation: frankenstein-glow 2s ease-in-out infinite;
+}
+@keyframes frankenstein-glow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(184,50,48,0); }
+  50%     { box-shadow: 0 0 12px rgba(184,50,48,0.2); }
+}
+.frankenstein-alert h4 { font-size:12px; font-weight:800; color:var(--error); margin-bottom:2px; letter-spacing:0.04em; }
+.frankenstein-alert p  { font-size:11px; color:var(--text-secondary); line-height:1.5; }
+
+/* API Setu Mode Toggle */
+.api-setu-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem;
+  background: var(--surface-container); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); margin-top: 0.75rem;
+}
+.api-setu-toggle-label { display:flex; align-items:center; gap:0.4rem; font-size:12px; font-weight:600; color:var(--text-secondary); }
+.toggle-switch { position:relative; display:inline-block; width:40px; height:22px; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider {
+  position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+  background:var(--outline-variant); border-radius:22px; transition:background 0.3s;
+}
+.toggle-slider::before {
+  content:''; position:absolute; height:16px; width:16px; left:3px; bottom:3px;
+  background:white; border-radius:50%; transition:transform 0.3s;
+}
+input:checked + .toggle-slider { background:var(--primary); }
+input:checked + .toggle-slider::before { transform:translateX(18px); }
+.api-setu-status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; animation:dot-pulse 2s ease-in-out infinite; }
+.api-setu-status-dot.online  { background:var(--success); }
+.api-setu-status-dot.offline { background:var(--warning); }
+@keyframes dot-pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:0.6; transform:scale(0.85); } }
+
+
+
+/* BSA Certificate Download Button */
+.btn-bsa-cert {
+  display:inline-flex; align-items:center; gap:0.5rem;
+  background:linear-gradient(135deg,#0A1628 0%,#1a2d4a 100%); color:#C9A84C;
+  border:1px solid rgba(201,168,76,0.4); border-radius:var(--radius-sm);
+  padding:0.7rem 1.25rem; font-size:13px; font-weight:700; cursor:pointer;
+  transition:all 0.2s ease; text-decoration:none; font-family:var(--font-body);
+}
+.btn-bsa-cert:hover {
+  background:linear-gradient(135deg,#0f1f3d 0%,#1e3660 100%);
+  border-color:rgba(201,168,76,0.7); box-shadow:0 4px 16px rgba(201,168,76,0.2); transform:translateY(-1px);
+}
+.btn-bsa-cert:active { transform:translateY(0); }
+
+
+
+/* ELA Placeholder */
+.ela-placeholder {
+  width:100%; height:100%; min-height:220px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:0.6rem;
+  background:#0d0d0d; color:rgba(255,255,255,0.3); font-size:12px;
+}
+.ela-placeholder .material-symbols-outlined { font-size:36px; opacity:0.3; color:#ff4444; }

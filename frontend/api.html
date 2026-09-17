@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>API Access &amp; Gateways — VERIDOC</title>
+  <meta name="description" content="Provision signed institutional tokens, verify documents programmatically, test statutory endpoints, and run genuine vs altered specimen demonstrations.">
+
+  <!-- Terra Organic Typography: Literata (Serif Headline), Nunito Sans (Body), JetBrains Mono (Code/Hashes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..800;1,7..72,400..800&family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..800&display=swap" rel="stylesheet">
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles-v2-additions.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    
+    <!-- Top Menu Bar: VERIDOC and page links names -->
+    <header class="terra-header">
+      
+      <!-- Brand: Just VERIDOC -->
+      <a href="/" class="brand-section" id="btn-brand-home" title="VERIDOC Home" style="text-decoration: none; gap: 0.6rem;">
+        <div class="brand-shield-icon" style="width: 38px; height: 38px;">
+          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 22px;">verified_user</span>
+        </div>
+        <span class="brand-text-logo" style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-primary);">VERIDOC</span>
+      </a>
+
+      <!-- 3-Dots Menu Button (Mobile & Tablet) -->
+      <button class="mobile-dots-btn" id="btn-mobile-menu" aria-label="Open Navigation Menu" title="Menu">
+        <span class="material-symbols-outlined">more_vert</span>
+      </button>
+
+      <!-- Page Links Names -->
+      <nav class="terra-nav" aria-label="Main Navigation">
+        <a href="/" class="terra-nav-btn" id="nav-tab-home">
+          <span class="material-symbols-outlined">dashboard</span>
+          <span>Home</span>
+        </a>
+        <a href="/verifydocuments" class="terra-nav-btn" id="nav-tab-verify">
+          <span class="material-symbols-outlined">document_scanner</span>
+          <span>Verify Documents</span>
+        </a>
+        <a href="/verified-documents" class="terra-nav-btn" id="nav-tab-verified">
+          <span class="material-symbols-outlined">bar_chart</span>
+          <span>Verified Documents</span>
+        </a>
+        <a href="/api-access" class="terra-nav-btn active" id="nav-tab-api">
+          <span class="material-symbols-outlined">terminal</span>
+          <span>API Access</span>
+        </a>
+        <a href="/verification-history" class="terra-nav-btn" id="nav-tab-history">
+          <span class="material-symbols-outlined">manage_history</span>
+          <span>History</span>
+        </a>
+      </nav>
+
+    </header>
+
+    <!-- Main Application View Area -->
+    <main class="terra-main">
+
+      <!-- ====================================================================
+           DEDICATED PAGE: API ACCESS & VERIFICATION GATEWAYS
+           ==================================================================== -->
+      <section class="view-section active" id="view-api">
+        
+        <!-- Page Back Bar -->
+        <div class="page-back-bar">
+          <a href="/" class="btn-terra-secondary" style="font-size: 12px; padding: 0.35rem 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span>
+            <span>Back to Home</span>
+          </a>
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">DEVELOPER API &amp; STATUTORY GATEWAYS</span>
+        </div>
+
+        <div class="section-headline-bar" style="margin-top: 0;">
+          <div>
+            <h2 class="section-main-title">
+              <span class="material-symbols-outlined">terminal</span>
+              <span>API Document Verification &amp; Gateways</span>
+            </h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 3px;">
+              Verify Aadhaar, PAN, and credentials programmatically with prototype mode and specimen demonstrations.
+            </p>
+          </div>
+          <span class="section-spec-count" id="registry-stat-pill">4 / 4 GATEWAYS ONLINE</span>
+        </div>
+
+        <!-- Prototype Mode Sandbox Banner -->
+        <div class="chamber-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary); background: rgba(74, 124, 89, 0.05);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span class="material-symbols-outlined" style="color: var(--primary);">tune</span>
+              <h3 style="font-family: var(--font-headline); font-size: 1.1rem; color: var(--text-primary); margin: 0;">
+                Prototype Sandbox: Skip External Live Government Gateway
+              </h3>
+            </div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--primary);">
+              <input type="checkbox" id="api-prototype-toggle" checked style="accent-color: var(--primary); width: 16px; height: 16px;">
+              <span>Skip Live External Gateway (Recommended for Testing &amp; Demo)</span>
+            </label>
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            Institutional live servers (UIDAI AUA, NSDL CBDT) require private intranet leased lines and dedicated HSM cryptographic hardware not accessible over public internet. When <strong>Prototype Mode</strong> is enabled, VERIDOC executes 100% full local cryptographic signature verification (RSA-2048, SHA-256 root CA, Verhoeff parity, OpenCV tamper detection) without network stalls or quota failures.
+          </p>
+        </div>
+
+        <!-- Interactive API Verification Console -->
+        <div class="api-panel-card" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3 style="font-family: var(--font-headline); font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
+              Interactive API Verification Console
+            </h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 3px;">
+              Execute live API calls to statutory endpoints, test custom documents, or trigger 1-click genuine vs altered specimens.
+            </p>
+          </div>
+
+          <!-- Target API Endpoint Selector -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">
+                Target API Endpoint
+              </label>
+              <select id="api-endpoint-select" class="terra-input" style="width: 100%; cursor: pointer;">
+                <option value="/api/v1/official/aadhaar/scan-qr">POST /api/v1/official/aadhaar/scan-qr (UIDAI Aadhaar Verification)</option>
+                <option value="/api/v1/official/pan/scan-qr">POST /api/v1/official/pan/scan-qr (NSDL / CBDT PAN Verification)</option>
+                <option value="/api/v1/verify">POST /api/v1/verify (Full AI Vision &amp; Forensic Document Pipeline)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">
+                Client Checkpoint ID
+              </label>
+              <input type="text" id="api-console-client-id" class="terra-input" style="width: 100%;" value="KIOSK-TERMINAL-01">
+            </div>
+          </div>
+
+          <!-- 1-Click Demo Specimen Presets -->
+          <div>
+            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+              1-Click Demo Specimens (Instant Evaluation):
+            </label>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="aadhaar_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Genuine Aadhaar (UIDAI Signed)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="aadhaar_altered" style="border-color: rgba(184, 50, 48, 0.3);">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--error);">gpp_maybe</span>
+                <span>Altered Aadhaar (Tampered / Mismatch)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="pan_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Genuine PAN Card (CBDT Active)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="pan_altered" style="border-color: rgba(184, 50, 48, 0.3);">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--error);">gpp_maybe</span>
+                <span>Altered PAN (Syntax Discrepancy)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom File Upload / Input -->
+          <div>
+            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">
+              Upload Document Image or QR Scan (Optional):
+            </label>
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="api-file-input" accept="image/*,application/pdf" class="terra-input" style="flex: 1; min-width: 240px; padding: 0.4rem;">
+              <button class="btn-terra-primary" id="btn-fire-api-call" style="padding: 0.6rem 1.4rem;">
+                <span class="material-symbols-outlined">play_arrow</span>
+                <span id="btn-fire-api-label">Execute API Request</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live API Response Display Area -->
+          <div id="api-console-response-box" style="display: none; background: #1c221e; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem; margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <span class="terra-badge verified" id="api-response-status-badge">HTTP 200 OK</span>
+                <span style="font-family: var(--font-mono); font-size: 11px; color: #a4ad9f;" id="api-response-time">Latency: 28ms</span>
+              </div>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn-terra-secondary" id="btn-copy-api-json" style="font-size: 11px; padding: 0.25rem 0.6rem; color: #d6e2d9; border-color: rgba(255,255,255,0.2);">
+                  Copy JSON
+                </button>
+                <button class="btn-terra-secondary" id="btn-view-api-cert" style="font-size: 11px; padding: 0.25rem 0.6rem; color: var(--primary-fixed); border-color: var(--primary);">
+                  Section 65B Certificate
+                </button>
+              </div>
+            </div>
+            <pre id="api-console-json-output" style="color: #c8e8d0; font-family: var(--font-mono); font-size: 12px; max-height: 340px; overflow-y: auto; margin: 0; line-height: 1.5;"></pre>
+          </div>
+
+        </div>
+
+        <!-- Provision Application API Key -->
+        <div class="api-panel-card">
+          <div>
+            <h3 style="font-family: var(--font-headline); font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">
+              Provision Application API Key
+            </h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 3px;">
+              Issue cryptographically signed credentials to authorize programmatic document verification.
+            </p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">Client Identifier</label>
+              <input type="text" id="api-client-id" class="terra-input" style="width: 100%;" value="KIOSK-TERMINAL-01">
+            </div>
+            <div>
+              <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;">Access Role</label>
+              <select id="api-role-select" class="terra-input" style="width: 100%; cursor: pointer;">
+                <option value="officer">Screening Officer (Verification &amp; Ingress)</option>
+                <option value="auditor">Judicial Auditor (Read-Only Ledger)</option>
+                <option value="admin">System Administrator (Full Control)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <button class="btn-terra-primary" id="btn-generate-api-key" style="width: fit-content;">
+              <span class="material-symbols-outlined">vpn_key</span>
+              <span>Generate API Key</span>
+            </button>
+          </div>
+
+          <!-- Generated Key Display Box -->
+          <div id="api-key-output-box" style="display: none; background: var(--surface-container-low); border: 1px solid var(--primary); border-radius: var(--radius-md); padding: 1.25rem;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase;">Active API Key Issued:</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0.5rem 0;">
+              <code id="api-generated-key-text" style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; word-break: break-all; color: var(--text-primary);"></code>
+              <button class="btn-terra-secondary" id="btn-copy-api-key">Copy Key</button>
+            </div>
+          </div>
+
+          <!-- Code Integration Snippets -->
+          <div>
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+              cURL Integration Command:
+            </span>
+            <div class="code-box-terra" id="curl-code-snippet">
+              curl -X POST "http://127.0.0.1:8000/api/v1/official/aadhaar/scan-qr" \<br>
+              &nbsp;&nbsp;-H "X-API-Key: veridoc_live_sample" \<br>
+              &nbsp;&nbsp;-F "skip_live_gateway=true" \<br>
+              &nbsp;&nbsp;-F "file=@/path/to/aadhaar_document.jpg"
+            </div>
+          </div>
+
+          <!-- Python Snippet -->
+          <div>
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+              Python requests Example:
+            </span>
+            <div class="code-box-terra" id="python-code-snippet">
+              import requests<br><br>
+              url = "http://127.0.0.1:8000/api/v1/official/aadhaar/scan-qr"<br>
+              files = {"file": open("aadhaar_card.jpg", "rb")}<br>
+              data = {"skip_live_gateway": "true", "prototype_mode": "true"}<br><br>
+              response = requests.post(url, files=files, data=data)<br>
+              result = response.json()<br>
+              print(f"Status: {result['verification_status']}, Citizen: {result.get('name')}")
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- SECTION 65B EVIDENCE MODAL -->
+    <div class="modal-scrim-bg" id="modal-cert-scrim">
+      <div class="cert-paper-sheet">
+        <div class="cert-guilloche-frame">
+          <div class="cert-wax-seal">
+            VERIDOC<br>SEC 65B<br>EVIDENCE
+          </div>
+
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="font-family: var(--font-headline); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--primary); text-transform: uppercase;">
+              Government of India &bull; Electronic Records Admissibility
+            </div>
+            <h2 style="font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 4px 0;">
+              Certificate of Electronic Evidence
+            </h2>
+            <p style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">
+              Issued Under Section 65B(4) of the Indian Evidence Act, 1872
+            </p>
+          </div>
+
+          <div style="font-size: 13px; line-height: 1.6; color: var(--text-primary); display: flex; flex-direction: column; gap: 0.85rem;">
+            <p>
+              This is to certify that the electronic record identified below was generated, processed, and cryptographically verified by the <strong>VERIDOC Document Verification Engine</strong> under continuous automated examination without manual modification of raw pixel data.
+            </p>
+
+            <div style="background: var(--surface-container-low); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; font-size: 12px; display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem;">
+              <strong>Session ID:</strong> <span id="cert-session-id" style="font-family: var(--font-mono); color: var(--primary);">—</span>
+              <strong>Document Category:</strong> <span id="cert-doc-type">—</span>
+              <strong>Verification Verdict:</strong> <span id="cert-verdict" style="font-weight: 700;">—</span>
+              <strong>Risk Score:</strong> <span id="cert-risk-score">—</span>
+              <strong>Timestamp (UTC):</strong> <span id="cert-timestamp" style="font-family: var(--font-mono);">—</span>
+              <strong>SHA-256 Digest:</strong> <span id="cert-hash" style="font-family: var(--font-mono); font-size: 10px; word-break: break-all; color: var(--primary);">—</span>
+              <strong>Issuing Mechanism:</strong> <span>Developer REST API Token Provisioning</span>
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-secondary);">
+              I hereby declare that the electronic optical inspection engine was functioning properly at all material times and that the cryptographic signature above affirms the integrity and authenticity of this record.
+            </p>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn-terra-secondary" onclick="window.print()">
+              <span class="material-symbols-outlined">print</span>
+              <span>Print Certificate</span>
+            </button>
+            <button class="btn-terra-primary" onclick="closeCertModal()" style="width: auto; padding: 0.6rem 1.5rem;">
+              <span>Dismiss</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

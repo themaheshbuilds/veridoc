@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Document Verification — VERIDOC Sovereign Security Suite</title>
+  <meta name="description" content="Autonomous document forensics station. Optical quality analysis, ELA tampering detection, multilingual AI OCR, Verhoeff parity, and Section 65B compliance.">
+
+  <!-- Terra Organic Typography: Literata (Serif Headline), Nunito Sans (Body), JetBrains Mono (Code/Hashes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..800;1,7..72,400..800&family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..800&display=swap" rel="stylesheet">
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles-v2-additions.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    
+    <!-- Top Menu Bar: VERIDOC and page links names -->
+    <header class="terra-header">
+      
+      <!-- Brand: VERIDOC -->
+      <a href="/" class="brand-section" id="btn-brand-home" title="VERIDOC Home" style="text-decoration: none; gap: 0.6rem;">
+        <div class="brand-shield-icon" style="width: 38px; height: 38px;">
+          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 22px;">verified_user</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0;">
+          <span class="brand-text-logo" style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-primary); line-height: 1.1;">VERIDOC</span>
+          <span style="font-size: 9px; font-weight: 600; color: var(--primary); letter-spacing: 0.04em; line-height: 1;">Sovereign Document Forensics</span>
+        </div>
+      </a>
+      <!-- 3-Dots Menu Button (Mobile & Tablet) -->
+      <button class="mobile-dots-btn" id="btn-mobile-menu" aria-label="Open Navigation Menu" title="Menu">
+        <span class="material-symbols-outlined">more_vert</span>
+      </button>
+
+      <!-- Page Links Names -->
+      <nav class="terra-nav" aria-label="Main Navigation">
+        <a href="/" class="terra-nav-btn" id="nav-tab-home">
+          <span class="material-symbols-outlined">dashboard</span>
+          <span>Home</span>
+        </a>
+        <a href="/verifydocuments" class="terra-nav-btn active" id="nav-tab-verify">
+          <span class="material-symbols-outlined">document_scanner</span>
+          <span>Verify Documents</span>
+        </a>
+        <a href="/verified-documents" class="terra-nav-btn" id="nav-tab-verified">
+          <span class="material-symbols-outlined">bar_chart</span>
+          <span>Verified Documents</span>
+        </a>
+        <a href="/api-access" class="terra-nav-btn" id="nav-tab-api">
+          <span class="material-symbols-outlined">terminal</span>
+          <span>API Access</span>
+        </a>
+        <a href="/verification-history" class="terra-nav-btn" id="nav-tab-history">
+          <span class="material-symbols-outlined">manage_history</span>
+          <span>History</span>
+        </a>
+      </nav>
+
+    </header>
+
+    <!-- Main Application View Area -->
+    <main class="terra-main">
+
+      <!-- ====================================================================
+           DEDICATED PAGE: DOCUMENT VERIFICATION STATION
+           ==================================================================== -->
+      <section class="view-section active" id="view-verify">
+        
+        <!-- Page Back Bar -->
+        <div class="page-back-bar">
+          <a href="/" class="btn-terra-secondary" style="font-size: 12px; padding: 0.35rem 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span class="material-symbols-outlined" style="font-size: 16px;">arrow_back</span>
+            <span>Back to Home</span>
+          </a>
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">STATION: DOCUMENT VERIFICATION</span>
+        </div>
+
+        <!-- Header Banner -->
+        <div class="section-headline-bar" style="margin-top: 0;">
+          <div>
+            <h2 class="section-main-title">
+              <span class="material-symbols-outlined">document_scanner</span>
+              <span>Autonomous Document Verification Station</span>
+            </h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 3px;">
+              Upload any identity or travel document (Passport, Aadhaar, PAN, Driving Licence, Marksheet, etc.). Multiple documents are cross-checked for demographic consistency. Compliant with Section 63 BSA 2023.
+            </p>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
+            <span class="section-spec-count" id="session-badge-id">SESSION: READY</span>
+            <div class="execution-timer" id="execution-timer">
+              <span class="material-symbols-outlined" style="font-size: 14px;">bolt</span>
+              <span id="timer-display">Ready</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Document Ingress & Upload Box -->
+        <div class="chamber-card" style="margin-bottom: 1.75rem;">
+          <div class="dropzone-terra" id="main-dropzone">
+            <input type="file" id="file-input-main" accept="image/*,.pdf" multiple style="display: none;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1.5rem;">
+              <div class="brand-shield-icon" style="width: 52px; height: 52px; background: rgba(74, 124, 89, 0.12);">
+                <span class="material-symbols-outlined" style="font-size: 30px; color: var(--primary);">cloud_upload</span>
+              </div>
+              <p style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">
+                Drag &amp; drop document scan(s) here, or <span style="color: var(--primary); text-decoration: underline; cursor: pointer;">click to browse</span>
+              </p>
+              <p style="font-size: 12px; color: var(--text-secondary);">
+                Supports PDF, JPEG, PNG, WEBP, TIFF &bull; Up to 25MB each
+              </p>
+            </div>
+          </div>
+
+          <!-- Staged Files Preview Strip -->
+          <div id="staged-files-container" style="display: none; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+              Selected Documents for Analysis:
+            </span>
+            <div id="staged-files-list" style="display: flex; flex-wrap: wrap; gap: 0.6rem;"></div>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; flex-wrap: wrap; gap: 1rem;">
+              <label style="display: flex; align-items: center; gap: 0.45rem; font-size: 12px; color: var(--text-primary); cursor: pointer;">
+                <input type="checkbox" id="check-force-ai" style="accent-color: var(--primary);">
+                <span>Force Deep AI-Assisted Audit (even if fast optical checks pass)</span>
+              </label>
+
+              <!-- API Setu Gateway Toggle -->
+              <div class="api-setu-toggle-row" style="flex: 1; min-width: 280px;">
+                <div class="api-setu-toggle-label">
+                  <div class="api-setu-status-dot offline" id="api-setu-dot"></div>
+                  <span class="material-symbols-outlined" style="font-size: 14px;">cloud_sync</span>
+                  <span id="api-setu-label">Sovereign Edge (Offline)</span>
+                </div>
+                <label class="toggle-switch" title="Toggle between offline sandbox and live API Setu gateway">
+                  <input type="checkbox" id="toggle-api-setu">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div style="display: flex; gap: 0.6rem; align-items: center;">
+                <button class="btn-terra-secondary" id="btn-clear-staged">Clear Selection</button>
+                <button class="btn-terra-primary" id="btn-execute-verify" style="padding: 0.75rem 1.75rem;">
+                  <span class="material-symbols-outlined">verified</span>
+                  <span id="btn-verify-label">Run Verification Pipeline</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE A: EMPTY STATE -->
+        <div id="empty-state-container" class="chamber-card" style="text-align: center; padding: 3rem 2rem;">
+          <div class="brand-shield-icon" style="width: 64px; height: 64px; margin: 0 auto 1rem auto; background: var(--surface-container);">
+            <span class="material-symbols-outlined" style="font-size: 36px; color: var(--text-muted);">folder_open</span>
+          </div>
+          <h3 style="font-family: var(--font-headline); font-size: 1.35rem; color: var(--text-primary);">
+            No Verification Results Yet
+          </h3>
+          <p style="font-size: 13px; color: var(--text-secondary); max-width: 580px; margin: 0.5rem auto 1.75rem auto; line-height: 1.6;">
+            Every result in VERIDOC is computed exclusively from the actual document you upload. Upload an identity card, passport, or visa above to trigger genuine optical quality analysis, error-level tampering forensics, QR decoding, and mathematical check digits.
+          </p>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; text-align: left;">
+            <div style="background: var(--surface-container-low); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">shutter_speed</span>
+                <strong style="font-size: 13px; color: var(--text-primary);">Quality Gate</strong>
+              </div>
+              <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                OpenCV Laplacian variance blur calculation, resolution verification, brightness, contrast, and skew estimation.
+              </p>
+            </div>
+
+            <div style="background: var(--surface-container-low); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                <span class="material-symbols-outlined" style="color: var(--tertiary); font-size: 20px;">layers</span>
+                <strong style="font-size: 13px; color: var(--text-primary);">Error Level Analysis</strong>
+              </div>
+              <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                Pixel-wise compression difference matrix detecting localized splicing, photo alterations, and synthetic overlays.
+              </p>
+            </div>
+
+            <div style="background: var(--surface-container-low); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">qr_code_scanner</span>
+                <strong style="font-size: 13px; color: var(--text-primary);">QR, Barcodes &amp; Checksums</strong>
+              </div>
+              <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                Native 1D linear barcode decoding (Code 128, Code 39, EAN), 2D QR matrix decoding, Verhoeff Aadhaar parity, and ICAO 9303 MRZ checks.
+              </p>
+            </div>
+
+            <div style="background: var(--surface-container-low); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                <span class="material-symbols-outlined" style="color: var(--secondary); font-size: 20px;">compare_arrows</span>
+                <strong style="font-size: 13px; color: var(--text-primary);">Cross-Document Check</strong>
+              </div>
+              <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                Upload multiple documents to detect demographic discrepancies (e.g. Passport DOB vs. Visa DOB mismatches).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE B: PROCESSING PROGRESS -->
+        <div id="processing-state-container" class="chamber-card" style="display: none; text-align: center; padding: 2.5rem 1.5rem;">
+          <div class="pulse-dot" style="width: 16px; height: 16px; margin: 0 auto 1rem auto;"></div>
+          <h3 style="font-family: var(--font-headline); font-size: 1.25rem;" id="proc-stage-title">
+            Executing Multi-Stage Verification Pipeline...
+          </h3>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="proc-stage-sub">
+            Analyzing uploaded document in memory with zero citizen data retention.
+          </p>
+
+          <div style="max-width: 500px; margin: 1.5rem auto 0 auto; display: flex; flex-direction: column; gap: 0.6rem;">
+            <div class="stage-step-row passed" id="pr-step-1">
+              <span>01 &bull; Document Ingress &amp; SHA-256 Hashing</span>
+              <span class="terra-badge verified">COMPLETED</span>
+            </div>
+            <div class="stage-step-row processing" id="pr-step-2">
+              <span>02 &bull; Optical Quality Assessment (Blur, Skew, Illumination)</span>
+              <span class="terra-badge review" id="pr-label-2">PROCESSING</span>
+            </div>
+            <div class="stage-step-row" id="pr-step-3">
+              <span>03 &bull; Forensic Compression Analysis &amp; Tamper Detection</span>
+              <span class="terra-badge guard" id="pr-label-3">QUEUED</span>
+            </div>
+            <div class="stage-step-row" id="pr-step-4">
+              <span>04 &bull; Structure Extraction, Multilingual AI OCR &amp; Checksums</span>
+              <span class="terra-badge guard" id="pr-label-4">QUEUED</span>
+            </div>
+            <div class="stage-step-row" id="pr-step-5">
+              <span>05 &bull; Two-Stage AI Audit &amp; Section 65B Ledger Seal</span>
+              <span class="terra-badge guard" id="pr-label-5">QUEUED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE C: RESULTS PRESENTATION -->
+        <div id="results-state-container" style="display: none;">
+          
+          <!-- Quality Alert Banner -->
+          <div id="quality-alert-box" class="quality-alert-banner" style="display: none; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: flex-start; gap: 0.85rem;">
+              <span class="material-symbols-outlined" style="font-size: 26px; color: var(--error);" id="quality-alert-icon">warning</span>
+              <div>
+                <strong style="font-size: 1rem; color: var(--text-primary); display: block;" id="quality-alert-title">
+                  Low Document Quality Detected
+                </strong>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;" id="quality-alert-desc">
+                  Low document quality. Reliable verification is not possible. Please upload a clearer document.
+                </p>
+                <div id="quality-defects-list" style="margin-top: 0.5rem; font-size: 12px; color: var(--text-secondary);"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-Document Tab Switcher -->
+          <div id="multi-doc-nav-strip" style="display: none; margin-bottom: 1.25rem;">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+              Inspected Documents in this Session:
+            </span>
+            <div id="multi-doc-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+          </div>
+
+          <!-- Cross-Document Mismatch Alert Card -->
+          <div id="cross-doc-card" class="chamber-card" style="display: none; border-left: 4px solid var(--error); margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="material-symbols-outlined" style="color: var(--error); font-size: 24px;">error</span>
+                <strong style="font-size: 1rem; color: var(--text-primary);">Cross-Document Demographic Inconsistency Detected</strong>
+              </div>
+              <span class="terra-badge review">CONFLICT FLAGGED</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="cross-doc-summary">
+              Cross-document comparison identified discrepancies between submitted credentials.
+            </p>
+            <div style="overflow-x: auto; margin-top: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+              <table class="terra-table" id="cross-doc-table">
+                <thead>
+                  <tr>
+                    <th>Identity Field</th>
+                    <th>Document A</th>
+                    <th>Value A</th>
+                    <th>Document B</th>
+                    <th>Value B</th>
+                    <th>Discrepancy Details</th>
+                  </tr>
+                </thead>
+                <tbody id="cross-doc-rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Two-Column Verification Layout -->
+          <div class="chamber-split-layout">
+            
+            <!-- Left Column: Viewport -->
+            <div class="chamber-card">
+              
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-family: var(--font-headline); font-weight: 700; font-size: 1.05rem;">Forensic Document Viewport</span>
+                  <span style="font-size: 11px; color: var(--text-secondary); display: block;" id="viewer-filename">doc.jpg</span>
+                </div>
+                <span class="terra-badge verified" id="viewer-quality-pill">QUALITY: GOOD</span>
+              </div>
+
+              <div class="optical-viewport-container" id="doc-viewport-container">
+                <img id="active-document-image" src="" alt="Uploaded Document" class="optical-doc-img">
+                <div class="bbox-overlay-layer" id="bbox-overlay-layer"></div>
+              </div>
+
+              <!-- Legend -->
+              <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 11px; font-weight: 600; padding: 0.5rem; background: var(--surface-container-low); border-radius: var(--radius-sm);">
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                  <span style="width: 10px; height: 10px; border-radius: 2px; background: var(--error); display: inline-block;"></span>
+                  <span>Suspicious / Altered Region</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                  <span style="width: 10px; height: 10px; border-radius: 2px; background: #2563eb; display: inline-block;"></span>
+                  <span>Biometric Portrait Frame</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                  <span style="width: 10px; height: 10px; border-radius: 2px; background: var(--success); display: inline-block;"></span>
+                  <span>Decoded 2D QR Code</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                  <span style="width: 10px; height: 10px; border-radius: 2px; background: #0d9488; display: inline-block;"></span>
+                  <span>Decoded 1D Barcode</span>
+                </div>
+              </div>
+
+              <!-- Quality Diagnostics -->
+              <div style="background: var(--surface-container-low); border-radius: var(--radius-sm); padding: 0.85rem; border: 1px solid var(--border-subtle); font-size: 12px;">
+                <strong style="display: block; margin-bottom: 4px; color: var(--text-primary);">Quality Diagnostics</strong>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; color: var(--text-secondary);">
+                  <div>Sharpness (Laplacian): <strong id="val-qual-sharp" style="color: var(--text-primary);">0</strong></div>
+                  <div>Resolution: <strong id="val-qual-res" style="color: var(--text-primary);">0x0</strong></div>
+                  <div>Brightness: <strong id="val-qual-bright" style="color: var(--text-primary);">0</strong></div>
+                  <div>Skew Angle: <strong id="val-qual-skew" style="color: var(--text-primary);">0°</strong></div>
+                </div>
+              </div>
+
+              <!-- Preprocessing Diagnostics -->
+              <div id="preprocessing-diagnostics-card" style="background: var(--surface-container-low); border-radius: var(--radius-sm); padding: 0.85rem; border: 1px solid var(--border-subtle); font-size: 12px; margin-top: 0.75rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                  <strong style="color: var(--text-primary);">Pre-OCR Geometry &amp; Enhancement</strong>
+                  <span class="terra-badge verified" style="font-size: 9px; padding: 2px 6px;">8-Stage CV Suite</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; color: var(--text-secondary); font-size: 11px;">
+                  <div>Orientation Corrected: <strong id="val-preproc-rot" style="color: var(--text-primary);">0°</strong></div>
+                  <div>Perspective Warped: <strong id="val-preproc-persp" style="color: var(--text-primary);">No</strong></div>
+                  <div>Boundary Segmented: <strong id="val-preproc-boundary" style="color: var(--text-primary);">No</strong></div>
+                  <div>Resolution Upscaled: <strong id="val-preproc-res" style="color: var(--text-primary);">No</strong></div>
+                  <div>Variants Evaluated: <strong id="val-preproc-variants" style="color: var(--text-primary);">4</strong></div>
+                  <div>Optimal Candidate: <strong id="val-preproc-selected" style="color: var(--primary);">CLAHE</strong></div>
+                </div>
+                <div style="margin-top: 6px; font-size: 10px; color: var(--text-muted);">
+                  Languages Detected: <strong id="val-preproc-langs" style="color: var(--text-primary);">English</strong>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Column: Scoreboard & Details -->
+            <div class="chamber-card">
+              
+              <div class="scoreboard-box">
+                <div class="verdict-ribbon clear" id="master-verdict-ribbon">
+                  <div class="verdict-title-text" id="master-verdict-text">
+                    <span class="material-symbols-outlined" id="master-verdict-icon">verified</span>
+                    <span id="master-verdict-label">VERDICT: CLEAR</span>
+                  </div>
+                  <span class="terra-badge verified" id="master-status-badge">LOW RISK</span>
+                </div>
+
+                <div class="tri-metrics-row">
+                  <div class="metric-terra-cell">
+                    <div class="metric-cell-label">Calculated Risk Score</div>
+                    <div class="metric-cell-val" id="metric-risk-val">0</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Scale: 0 (Safe) to 100 (High)</div>
+                  </div>
+                  <div class="metric-terra-cell">
+                    <div class="metric-cell-label">System Confidence</div>
+                    <div class="metric-cell-val" id="metric-conf-val">95%</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Document-Level Evidence</div>
+                  </div>
+                  <div class="metric-terra-cell">
+                    <div class="metric-cell-label">Recommendation</div>
+                    <div class="metric-cell-val" id="metric-rec-val" style="font-size: 1rem; color: var(--primary);">CLEAR</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Decision Support</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI-Assisted Deeper Analysis -->
+              <div id="ai-deep-analysis-card" style="display: none; background: rgba(112, 92, 48, 0.08); border: 1px solid var(--tertiary); border-radius: var(--radius-sm); padding: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.45rem; color: var(--tertiary); font-weight: 700; font-size: 12px; text-transform: uppercase;">
+                  <span class="material-symbols-outlined" style="font-size: 18px;">neurology</span>
+                  <span>AI-Assisted Deeper Analysis Triggered</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-primary); margin-top: 4px; font-weight: 600;" id="ai-trigger-reason"></p>
+                <div style="margin-top: 0.5rem; font-size: 11px; color: var(--text-secondary);" id="ai-findings-list"></div>
+              </div>
+
+              <!-- Rationale Card -->
+              <div style="background: var(--surface-container-low); border-radius: var(--radius-sm); padding: 1rem; border: 1px solid var(--border-subtle);">
+                <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Forensic Synthesis Rationale</span>
+                <p style="font-size: 12px; color: var(--text-primary); line-height: 1.5;" id="evidence-rationale-text"></p>
+              </div>
+
+              <!-- Extracted Identity Fields -->
+              <div style="background: var(--surface-container-low); border-radius: var(--radius-sm); padding: 1rem; border: 1px solid var(--border-subtle);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Extracted Document Fields</span>
+                  <span class="terra-badge verified" id="checksum-status-pill">CHECKSUMS VALID</span>
+                </div>
+
+                <div id="dynamic-cat-bar" style="background: var(--surface-container); border-radius: 4px; padding: 6px 10px; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 11px;">
+                  <div>
+                    <span style="color: var(--text-muted);">Discovered Category:</span>
+                    <strong id="dynamic-cat-text" style="color: var(--primary);">GENERAL_DOCUMENT</strong>
+                    <span id="dynamic-subcat-badge" class="terra-badge" style="margin-left: 6px; font-size: 10px;">Official Document</span>
+                  </div>
+                  <div id="dynamic-jurisdiction-text" style="color: var(--text-muted); font-size: 11px;">
+                    Jurisdiction: <strong id="dynamic-state-text" style="color: var(--text-primary);">India</strong>
+                  </div>
+                </div>
+
+                <div id="dynamic-tags-container" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.75rem;"></div>
+
+                <div id="doc-qr-attestation-card" style="display: none; background: #eef7f0; border: 1px solid #4a7c59; border-left: 4px solid #4a7c59; border-radius: 4px; padding: 10px 12px; margin-bottom: 0.75rem; font-size: 11px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #2d5a3c;">
+                      <span class="material-symbols-outlined" style="font-size: 18px; color: #4a7c59;">verified</span>
+                      <span id="doc-qr-attestation-title">Official Statutory QR Cryptographically Validated</span>
+                    </div>
+                    <span class="terra-badge verified" id="doc-qr-signature-badge">VALID_RSA_2048</span>
+                  </div>
+                  <div id="doc-qr-attestation-details" style="margin-top: 4px; color: #3b5245; line-height: 1.4;"></div>
+                </div>
+
+                <div id="uncertainty-banner" style="display: none; background: #fff8e6; border: 1px solid #d4a72c; border-radius: 4px; padding: 8px 12px; margin-bottom: 0.75rem; font-size: 11px; color: #855b00;">
+                  <div style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">warning</span>
+                    <span>Low Optical Clarity Advisory</span>
+                  </div>
+                  <div id="uncertainty-msg" style="margin-top: 4px; line-height: 1.4;"></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; font-size: 12px;">
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Document Type</span>
+                    <strong id="ext-field-type" style="color: var(--text-primary);">PASSPORT</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Document Number</span>
+                    <strong id="ext-field-num" style="color: var(--text-primary); font-family: var(--font-mono);">—</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Full Name</span>
+                    <strong id="ext-field-name" style="color: var(--text-primary);">—</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Date of Birth</span>
+                    <strong id="ext-field-dob" style="color: var(--text-primary);">—</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Expiry Date</span>
+                    <strong id="ext-field-expiry" style="color: var(--text-primary);">—</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; display: block;">Gender / Nat.</span>
+                    <strong id="ext-field-gender" style="color: var(--text-primary);">—</strong>
+                  </div>
+                </div>
+
+                <div id="dynamic-fields-section" style="display: none; margin-top: 0.85rem; border-top: 1px dashed var(--border-subtle); padding-top: 0.65rem;">
+                  <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">Dynamically Extracted Attributes</span>
+                  <div id="dynamic-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 11px;"></div>
+                </div>
+
+                <div id="checksum-details-text" style="font-size: 11px; color: var(--text-secondary); margin-top: 0.65rem; border-top: 1px dashed var(--border-subtle); padding-top: 0.5rem;"></div>
+              </div>
+
+              <!-- Atomic Evidence Records Table -->
+              <div>
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">Atomic Evidence Items</span>
+                <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+                  <table class="terra-table">
+                    <thead>
+                      <tr>
+                        <th>Check ID</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Confidence</th>
+                        <th>Finding Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody id="evidence-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Bottom Actions Row -->
+              <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <button class="btn-terra-secondary" id="btn-show-cert">
+                  <span class="material-symbols-outlined">gavel</span>
+                  <span>Section 65B Certificate</span>
+                </button>
+                <button class="btn-terra-secondary" id="btn-export-json">
+                  <span class="material-symbols-outlined">download</span>
+                  <span>Export JSON Attestation</span>
+                </button>
+                <button class="btn-terra-secondary" id="btn-new-verification">
+                  <span class="material-symbols-outlined">refresh</span>
+                  <span>New Verification</span>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- Triple Column Forensic Overview (Doc Preview, ELA Heatmap, Extracted Registry) -->
+          <div id="triple-col-results-container" style="margin-top: 1.5rem;"></div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- SECTION 65B EVIDENCE MODAL -->
+    <div class="modal-scrim-bg" id="modal-cert-scrim">
+      <div class="cert-paper-sheet">
+        <div class="cert-guilloche-frame">
+          <div class="cert-wax-seal">
+            VERIDOC<br>SEC 65B<br>EVIDENCE
+          </div>
+
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="font-family: var(--font-headline); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--primary); text-transform: uppercase;">
+              Government of India &bull; Electronic Records Admissibility
+            </div>
+            <h2 style="font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 4px 0;">
+              Certificate of Electronic Evidence
+            </h2>
+            <p style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">
+              Issued Under Section 65B(4) of the Indian Evidence Act, 1872
+            </p>
+          </div>
+
+          <div style="font-size: 13px; line-height: 1.6; color: var(--text-primary); display: flex; flex-direction: column; gap: 0.85rem;">
+            <p>
+              This is to certify that the electronic record identified below was generated, processed, and cryptographically verified by the <strong>VERIDOC Document Verification Engine</strong> under continuous automated examination without manual modification of raw pixel data.
+            </p>
+
+            <div style="background: var(--surface-container-low); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; font-size: 12px; display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem;">
+              <strong>Session ID:</strong> <span id="cert-session-id" style="font-family: var(--font-mono); color: var(--primary);">—</span>
+              <strong>Document Category:</strong> <span id="cert-doc-type">—</span>
+              <strong>Verification Verdict:</strong> <span id="cert-verdict" style="font-weight: 700;">—</span>
+              <strong>Risk Score:</strong> <span id="cert-risk-score">—</span>
+              <strong>Timestamp (UTC):</strong> <span id="cert-timestamp" style="font-family: var(--font-mono);">—</span>
+              <strong>SHA-256 Digest:</strong> <span id="cert-hash" style="font-family: var(--font-mono); font-size: 10px; word-break: break-all; color: var(--primary);">—</span>
+              <strong>Issuing Mechanism:</strong> <span>Document-Level Cryptographic &amp; ELA Analysis</span>
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-secondary);">
+              I hereby declare, pursuant to Section 63(4) of the Bharatiya Sakshya Adhiniyam (BSA) 2023, that the electronic optical inspection engine was functioning properly at all material times and that the cryptographic signature above affirms the integrity and authenticity of this record.
+            </p>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn-terra-secondary" onclick="window.print()">
+              <span class="material-symbols-outlined">print</span>
+              <span>Print Certificate</span>
+            </button>
+            <button class="btn-bsa-cert" id="btn-download-pdf-cert">
+              <span class="material-symbols-outlined">download</span>
+              <span>Download PDF &mdash; Section 63 BSA 2023</span>
+            </button>
+            <button class="btn-terra-primary" onclick="closeCertModal()" style="width: auto; padding: 0.6rem 1.5rem;">
+              <span>Dismiss</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

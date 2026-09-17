@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VERIDOC — Sovereign Document Forensics & Dual-Trust Verification</title>
+  <meta name="description" content="VERIDOC — Sovereign AI-Based Fake Identity & Document Screening System. Sashastra Seema Bal, Ministry of Home Affairs. Section 63 BSA 2023 compliant sovereign forensics.">
+
+  <!-- Terra Organic Typography: Literata (Serif Headline), Nunito Sans (Body), JetBrains Mono (Code/Hashes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..800;1,7..72,400..800&family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..800&display=swap" rel="stylesheet">
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles-v2-additions.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    
+    <!-- Top Menu Bar: VERIDOC and page links names -->
+    <header class="terra-header">
+      
+      <!-- Brand: VERIDOC -->
+      <a href="/" class="brand-section" id="btn-brand-home" title="VERIDOC Home" style="text-decoration: none; gap: 0.6rem;">
+        <div class="brand-shield-icon" style="width: 38px; height: 38px;">
+          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 22px;">verified_user</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0;">
+          <span class="brand-text-logo" style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-primary); line-height: 1.1;">VERIDOC</span>
+          <span style="font-size: 9px; font-weight: 600; color: var(--primary); letter-spacing: 0.04em; line-height: 1;">Sovereign Document Forensics</span>
+        </div>
+      </a>
+
+      <!-- 3-Dots Menu Button (Mobile & Tablet) -->
+      <button class="mobile-dots-btn" id="btn-mobile-menu" aria-label="Open Navigation Menu" title="Menu">
+        <span class="material-symbols-outlined">more_vert</span>
+      </button>
+
+      <!-- Page Links Names -->
+      <nav class="terra-nav" aria-label="Main Navigation">
+        <a href="/" class="terra-nav-btn active" id="nav-tab-home">
+          <span class="material-symbols-outlined">dashboard</span>
+          <span>Home</span>
+        </a>
+        <a href="/verifydocuments" class="terra-nav-btn" id="nav-tab-verify">
+          <span class="material-symbols-outlined">document_scanner</span>
+          <span>Verify Documents</span>
+        </a>
+        <a href="/verified-documents" class="terra-nav-btn" id="nav-tab-verified">
+          <span class="material-symbols-outlined">bar_chart</span>
+          <span>Verified Documents</span>
+        </a>
+        <a href="/api-access" class="terra-nav-btn" id="nav-tab-api">
+          <span class="material-symbols-outlined">terminal</span>
+          <span>API Access</span>
+        </a>
+        <a href="/verification-history" class="terra-nav-btn" id="nav-tab-history">
+          <span class="material-symbols-outlined">manage_history</span>
+          <span>History</span>
+        </a>
+      </nav>
+
+    </header>
+
+    <!-- Main Application View Area -->
+    <main class="terra-main">
+
+      <!-- ====================================================================
+           HOME LAUNCHPAD & DEDICATED STATIONS DIRECTORY
+           ==================================================================== -->
+      <section class="view-section active" id="view-home">
+        
+        <!-- Hero Launchpad Card -->
+        <div class="home-hero-card">
+          <div style="max-width: 860px;">
+            <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(74, 124, 89, 0.12); border: 1px solid rgba(74, 124, 89, 0.3); border-radius: var(--radius-full); padding: 0.35rem 0.85rem; margin-bottom: 0.85rem;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--primary);">verified_user</span>
+              <span style="font-size: 12px; font-weight: 700; color: var(--primary);">SECTION 63 BSA 2023 &bull; SOVEREIGN TRUST FRAMEWORK</span>
+            </div>
+            <h1 style="font-family: var(--font-headline); font-size: 2.15rem; font-weight: 800; color: var(--text-primary); line-height: 1.25; margin-bottom: 0.4rem;">
+              AI-Based Fake Identity &amp; Document Screening System
+            </h1>
+            <p style="font-size: 13px; font-weight: 600; color: var(--primary); margin-bottom: 0.65rem; letter-spacing: 0.02em;">
+              Sovereign Document Forensics &amp; Dual-Trust Verification &mdash; Sashastra Seema Bal, Ministry of Home Affairs
+            </p>
+            <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+              Offline document boundary extraction, bilingual Indic demographic parsing, localized tampering forensics, and statutory PKI cryptographic decoding. Select a dedicated verification station below to begin.
+            </p>
+          </div>
+
+          <!-- Live Operational Pulse Strip -->
+          <div class="home-pulse-strip">
+            <div class="home-pulse-item">
+              <span class="home-pulse-dot"></span>
+              <span>High-Precision AI OCR: Active</span>
+            </div>
+            <div class="home-pulse-item">
+              <span class="home-pulse-dot"></span>
+              <span>Windows Media OCR: 100% Offline Fallback</span>
+            </div>
+            <div class="home-pulse-item">
+              <span class="home-pulse-dot"></span>
+              <span>UIDAI RSA-2048 &amp; NSDL PKI: Direct Decryptor Ready</span>
+            </div>
+            <div class="home-pulse-item">
+              <span class="home-pulse-dot"></span>
+              <span>Section 65B Ledger: SHA-256 Audit Sealed</span>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Dedicated Verification Stations (Multi-Page Architecture) -->
+        <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h2 style="font-family: var(--font-headline); font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">
+              Dedicated Verification Stations
+            </h2>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              Individualized screening workflows tailored for document types, cryptographic barcodes, and database analytics.
+            </p>
+          </div>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">4 STATIONS AVAILABLE</span>
+        </div>
+
+        <div class="home-portals-grid">
+          
+          <!-- Station 1: Document Verification -->
+          <div class="portal-card">
+            <div>
+              <div class="portal-card-header">
+                <div class="portal-icon-box">
+                  <span class="material-symbols-outlined" style="font-size: 26px;">document_scanner</span>
+                </div>
+                <span class="terra-badge verified">MULTI-MODAL CV</span>
+              </div>
+              <h3 class="portal-card-title">Document Verification</h3>
+              <p class="portal-card-desc">
+                Autonomous screening for all identity and travel credentials. Performs automatic document orientation, perspective warp, high-precision multilingual OCR, anti-tamper ELA, and sovereign cryptographic QR validation.
+              </p>
+              <div class="portal-features-list">
+                <div><span class="material-symbols-outlined">check_circle</span>Passports, Aadhaar, PAN, DL, Voter ID, Visas</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Multilingual Indic transcription (English, Telugu, Hindi)</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Automatic 2048-bit QR detection &amp; PKI verification</div>
+              </div>
+            </div>
+            <a href="/verifydocuments" class="btn-terra-primary" style="width: 100%; justify-content: center; padding: 0.75rem; text-decoration: none;">
+              <span>Open Document Verifier</span>
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </a>
+          </div>
+
+          <!-- Station 3: Verified Documents & Metrics -->
+          <div class="portal-card">
+            <div>
+              <div class="portal-card-header">
+                <div class="portal-icon-box" style="background: rgba(112, 92, 48, 0.12); color: var(--tertiary);">
+                  <span class="material-symbols-outlined" style="font-size: 26px;">bar_chart</span>
+                </div>
+                <span class="terra-badge guard">LIVE METRICS</span>
+              </div>
+              <h3 class="portal-card-title">Verified Documents Directory</h3>
+              <p class="portal-card-desc">
+                Real-time dashboard tracking verified document volumes, breakdown across credential categories (Aadhaar, PAN, Passport, DL), and authentic audit status.
+              </p>
+              <div class="portal-features-list">
+                <div><span class="material-symbols-outlined">check_circle</span>Live count of all authenticated credentials</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Breakdown across Aadhaar, PAN, Passports, Licences</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Risk score distribution &amp; compliance ratios</div>
+              </div>
+            </div>
+            <a href="/verified-documents" class="btn-terra-primary" style="width: 100%; justify-content: center; padding: 0.75rem; text-decoration: none;">
+              <span>View Verified Documents</span>
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </a>
+          </div>
+
+          <!-- Station 4: API Access & Gateways -->
+          <div class="portal-card">
+            <div>
+              <div class="portal-card-header">
+                <div class="portal-icon-box" style="background: rgba(107, 99, 88, 0.12); color: var(--secondary);">
+                  <span class="material-symbols-outlined" style="font-size: 26px;">terminal</span>
+                </div>
+                <span class="terra-badge review">DEVELOPER API</span>
+              </div>
+              <h3 class="portal-card-title">API Access &amp; Gateways</h3>
+              <p class="portal-card-desc">
+                Provision signed institutional tokens, inspect live gateway statuses (UIDAI, NSDL, MoRTH, MEA), and test programmatic REST endpoints.
+              </p>
+              <div class="portal-features-list">
+                <div><span class="material-symbols-outlined">check_circle</span>Instant client ID token provisioning</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Interactive cURL and Python verification snippets</div>
+                <div><span class="material-symbols-outlined">check_circle</span>OpenAPI Swagger documentation link</div>
+              </div>
+            </div>
+            <a href="/api-access" class="btn-terra-primary" style="width: 100%; justify-content: center; padding: 0.75rem; text-decoration: none;">
+              <span>Open API Console</span>
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </a>
+          </div>
+
+          <!-- Station 5: Verification History & Ledger -->
+          <div class="portal-card">
+            <div>
+              <div class="portal-card-header">
+                <div class="portal-icon-box" style="background: rgba(74, 124, 89, 0.12); color: var(--primary);">
+                  <span class="material-symbols-outlined" style="font-size: 26px;">manage_history</span>
+                </div>
+                <span class="terra-badge verified">AUDIT LEDGER</span>
+              </div>
+              <h3 class="portal-card-title">Verification History &amp; Ledger</h3>
+              <p class="portal-card-desc">
+                Full searchable database of historical verification sessions with Section 65B Indian Evidence Act certificates and JSON attestation exports.
+              </p>
+              <div class="portal-features-list">
+                <div><span class="material-symbols-outlined">check_circle</span>Immutable audit trail with SHA-256 verification hash</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Filter by verdict (Clear, Review Required, Tampered)</div>
+                <div><span class="material-symbols-outlined">check_circle</span>Downloadable Section 65B compliance certificates</div>
+              </div>
+            </div>
+            <a href="/verification-history" class="btn-terra-primary" style="width: 100%; justify-content: center; padding: 0.75rem; text-decoration: none;">
+              <span>Open Verification Ledger</span>
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </a>
+          </div>
+
+        </div>
+
+        <!-- Recent Verification Records Snapshot on Home -->
+        <div class="chamber-card" style="margin-bottom: 2rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-family: var(--font-headline); font-size: 1.15rem; color: var(--text-primary);">
+                Recent Verification Activity
+              </h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Latest authenticated screenings recorded in local Section 65B database ledger.
+              </p>
+            </div>
+            <a href="/verification-history" class="btn-terra-secondary" style="font-size: 12px; padding: 0.35rem 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+              <span>View All Records</span>
+              <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
+            </a>
+          </div>
+
+          <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+            <table class="terra-table">
+              <thead>
+                <tr>
+                  <th>Session ID</th>
+                  <th>Timestamp (UTC)</th>
+                  <th>Doc Type</th>
+                  <th>Verdict</th>
+                  <th>Risk Score</th>
+                  <th>SHA-256 Audit Digest</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="home-recent-table-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                    Loading recent verification records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- SECTION 65B EVIDENCE MODAL -->
+    <div class="modal-scrim-bg" id="modal-cert-scrim">
+      <div class="cert-paper-sheet">
+        <div class="cert-guilloche-frame">
+          <div class="cert-wax-seal">
+            VERIDOC<br>SEC 63<br>BSA 2023
+          </div>
+
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="font-family: var(--font-headline); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--primary); text-transform: uppercase;">
+              Government of India &bull; Ministry of Home Affairs &bull; Sashastra Seema Bal
+            </div>
+            <h2 style="font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 4px 0;">
+              Certificate of Electronic Evidence
+            </h2>
+            <p style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">
+              Issued Under Section 63(4), Bharatiya Sakshya Adhiniyam (BSA) 2023
+            </p>
+          </div>
+
+          <div style="font-size: 13px; line-height: 1.6; color: var(--text-primary); display: flex; flex-direction: column; gap: 0.85rem;">
+            <p>
+              This is to certify that the electronic record identified below was generated, processed, and cryptographically verified by the <strong>VERIDOC Document Verification Engine</strong> under continuous automated examination without manual modification of raw pixel data.
+            </p>
+
+            <div style="background: var(--surface-container-low); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; font-size: 12px; display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem;">
+              <strong>Session ID:</strong> <span id="cert-session-id" style="font-family: var(--font-mono); color: var(--primary);">—</span>
+              <strong>Document Category:</strong> <span id="cert-doc-type">—</span>
+              <strong>Verification Verdict:</strong> <span id="cert-verdict" style="font-weight: 700;">—</span>
+              <strong>Risk Score:</strong> <span id="cert-risk-score">—</span>
+              <strong>Timestamp (UTC):</strong> <span id="cert-timestamp" style="font-family: var(--font-mono);">—</span>
+              <strong>SHA-256 Digest:</strong> <span id="cert-hash" style="font-family: var(--font-mono); font-size: 10px; word-break: break-all; color: var(--primary);">—</span>
+              <strong>Issuing Mechanism:</strong> <span>Document-Level Cryptographic &amp; ELA Analysis</span>
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-secondary);">
+              I hereby declare, pursuant to Section 63(4) of the Bharatiya Sakshya Adhiniyam (BSA) 2023, that the electronic optical inspection engine was functioning properly at all material times and that the cryptographic signature above affirms the integrity and authenticity of this record.
+            </p>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn-terra-secondary" onclick="window.print()">
+              <span class="material-symbols-outlined">print</span>
+              <span>Print Certificate</span>
+            </button>
+            <button class="btn-terra-primary" onclick="closeCertModal()" style="width: auto; padding: 0.6rem 1.5rem;">
+              <span>Dismiss</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
