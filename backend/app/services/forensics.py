@@ -135,14 +135,23 @@ class ForensicAnalyzer:
         """
         try:
             h, w = cv_img.shape[:2]
-            rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-            orig_pil = Image.fromarray(rgb_img)
+
+            # Ensure 3-channel BGR format for robust processing across grayscale, BGR, and BGRA
+            if len(cv_img.shape) == 2:
+                bgr_img = cv2.cvtColor(cv_img, cv2.COLOR_GRAY2BGR)
+            elif cv_img.shape[2] == 4:
+                bgr_img = cv2.cvtColor(cv_img, cv2.COLOR_BGRA2BGR)
+            else:
+                bgr_img = cv_img.copy()
+
+            rgb_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
+            orig_pil = Image.fromarray(rgb_img).convert("RGB")
 
             # Re-save to in-memory buffer at fixed 90% quality
             buf = io.BytesIO()
             orig_pil.save(buf, format="JPEG", quality=cls.ELA_QUALITY)
             buf.seek(0)
-            resaved_pil = Image.open(buf)
+            resaved_pil = Image.open(buf).convert("RGB")
 
             # Compute pixel difference
             diff = ImageChops.difference(orig_pil, resaved_pil)
@@ -167,7 +176,7 @@ class ForensicAnalyzer:
 
             # Count anomalous pixels ratio
             anomaly_pixels = cv2.countNonZero(dilated)
-            total_pixels = h * w
+            total_pixels = max(1, h * w)
             anomaly_score = float(anomaly_pixels) / float(total_pixels)
 
             # Find contours of localized anomalous regions
@@ -214,23 +223,23 @@ class ForensicAnalyzer:
                 heatmap = cv2.applyColorMap(norm_diff, cv2.COLORMAP_JET)
                 # Blend with original for context
                 alpha = 0.65
-                h_img, w_img = cv_img.shape[:2]
-                orig_resized = cv2.resize(cv_img, (w_img, h_img))  # same size already
-                blended = cv2.addWeighted(heatmap, alpha, orig_resized, 1 - alpha, 0)
+                blended = cv2.addWeighted(heatmap, alpha, bgr_img, 1.0 - alpha, 0)
                 # Overlay suspicious region boxes in glowing red
                 for box in suspicious_boxes:
-                    bx = int(box.x / 100 * w_img)
-                    by = int(box.y / 100 * h_img)
-                    bw2 = int(box.width / 100 * w_img)
-                    bh2 = int(box.height / 100 * h_img)
+                    bx = int(box.x / 100.0 * w)
+                    by = int(box.y / 100.0 * h)
+                    bw2 = int(box.width / 100.0 * w)
+                    bh2 = int(box.height / 100.0 * h)
                     cv2.rectangle(blended, (bx, by), (bx + bw2, by + bh2), (0, 0, 255), 2)
                 _, enc_buf = cv2.imencode(".png", blended)
                 ela_heatmap_b64 = "data:image/png;base64," + base64.b64encode(enc_buf).decode("ascii")
-            except Exception:
+            except Exception as e_heat:
+                logger.warning(f"Error encoding ELA heatmap: {e_heat}")
                 ela_heatmap_b64 = None
 
             return anomaly_score, suspicious_boxes, ela_heatmap_b64
-        except Exception:
+        except Exception as ex:
+            logger.warning(f"Error executing ELA analysis: {ex}")
             return 0.0, [], None
 
     @classmethod
