@@ -10,6 +10,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - OFFLINE_SANDBOX_MODE=true
       - API_V1_STR=/api/v1

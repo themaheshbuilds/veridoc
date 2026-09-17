@@ -42,7 +42,7 @@ class PreprocessingReport(BaseModel):
     resolution_upscaled: bool = Field(default=False, description="Whether image was super-resolved for text clarity")
     variants_tested: int = Field(default=1, description="Number of preprocessed visual candidate variants evaluated")
     selected_variant: str = Field(default="clahe_enhanced", description="The variant yielding highest OCR confidence")
-    ocr_engine_used: str = Field(default="Windows Media OCR", description="Primary OCR engine pipeline used")
+    ocr_engine_used: str = Field(default="RapidOCR (ONNX Deep Learning Offline)", description="Primary OCR engine pipeline used")
     languages_detected: List[str] = Field(default_factory=lambda: ["English"], description="Detected script languages")
     enhanced_image_base64: Optional[str] = Field(default=None, description="Base64 preview of enhanced image used for OCR")
 
@@ -117,6 +117,8 @@ class ForensicAnalysisReport(BaseModel):
     face_boxes: List[BoundingBox] = Field(default_factory=list)
     qr_detected: bool = False
     qr_boxes: List[BoundingBox] = Field(default_factory=list)
+    qr_payload: Optional[str] = None
+    qr_payloads: List[str] = Field(default_factory=list)
     qr_decoded_data: Optional[Dict[str, Any]] = Field(default=None, description="Decoded statutory QR / barcode payload and cryptographic verification status")
     barcode_detected: bool = False
     barcode_boxes: List[BoundingBox] = Field(default_factory=list)

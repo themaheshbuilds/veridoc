@@ -529,13 +529,25 @@ class DocumentAnalyzer:
 
         # 2. Extract visual fields from OCR text
         if not fields.dob:
-            dob_m = re.search(r'(?:DOB|Date of Birth|Birth Date|Birth)[:\s]+([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})', text, re.IGNORECASE)
+            dob_m = re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date|Birth)[\s:/]*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})', text, re.IGNORECASE)
             if dob_m:
                 fields.dob = dob_m.group(1)
             else:
-                yob_m = re.search(r'(?:Year of Birth|YOB)[:\s]+([12][90]\d{2})', text, re.IGNORECASE)
+                yob_m = re.search(r'(?:Year\s*of\s*Birth|YOB|Y0B)[\s:/]*([12][90]\d{2})', text, re.IGNORECASE)
                 if yob_m:
                     fields.dob = f"{yob_m.group(1)}-01-01"
+                else:
+                    all_dates = re.findall(r'\b([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})\b', text)
+                    for d in all_dates:
+                        parts = re.split(r'[/-]', d)
+                        if len(parts) == 3:
+                            try:
+                                yr = int(parts[2] if len(parts[0]) <= 2 else parts[0])
+                                if 1920 <= yr <= 2024:
+                                    fields.dob = d
+                                    break
+                            except ValueError:
+                                pass
 
         if not fields.gender:
             if "FEMALE" in text:
@@ -553,6 +565,11 @@ class DocumentAnalyzer:
                 if off_res.get("name"): fields.name = off_res["name"]
                 if off_res.get("dob"): fields.dob = off_res["dob"]
                 if off_res.get("gender"): fields.gender = off_res["gender"]
+                if off_res.get("care_of"): fields.care_of = off_res["care_of"]
+                if off_res.get("address"): fields.address = off_res["address"]
+                if off_res.get("pincode"): fields.pincode = off_res["pincode"]
+                if off_res.get("state"): fields.state = off_res["state"]
+                if off_res.get("district"): fields.district = off_res["district"]
                 if off_res.get("masked_aadhaar") and not fields.document_number:
                     fields.document_number = off_res["masked_aadhaar"]
         elif qr_data:
@@ -563,7 +580,99 @@ class DocumentAnalyzer:
                 fields.document_number = qr_data["uid"]
             positives.append("UIDAI Secure QR: Parsed demographic envelope from 2D cryptographic barcode.")
 
-        # 4. Extract Name if still missing
+        # 4. Extract Name from visual text with Intra-Document Cross-Checking
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        AADHAAR_IGNORE = {
+            "GOVERNMENT", "INDIA", "AUTHORITY", "IDENTIFICATION", "UNIQUE", 
+            "ENROLMENT", "ENROLLMENT", "MALE", "FEMALE", "AADHAAR", "HELP", "TELUGU",
+            "BHARAT", "SARKAR", "PRAADHIKARAN", "MERA", "PIN", "CODE", "POST",
+            "DISTRICT", "STATE", "ADDRESS", "INFORMATION", "PROOF", "CITIZENSHIP"
+        }
+
+        # Strategy A: Line preceding explicit DOB on card face
+        card_name = None
+        dob_idx = -1
+        for idx, line in enumerate(lines):
+            if re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date)[\s:/]*[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4}', line, re.IGNORECASE):
+                dob_idx = idx
+                break
+
+        if dob_idx > 0:
+            for prev_idx in range(dob_idx - 1, max(-1, dob_idx - 4), -1):
+                cand = lines[prev_idx].strip()
+                cand_clean = re.sub(r'[^A-Za-z\s\.]', '', cand).strip()
+                if len(cand_clean.split()) >= 1 and len(cand_clean) >= 3:
+                    if not any(ign in cand_clean.upper().split() for ign in AADHAAR_IGNORE):
+                        card_name = cand_clean
+                        if prev_idx > 0:
+                            reg_cand = lines[prev_idx - 1].strip()
+                            if any(ord(c) > 127 for c in reg_cand):
+                                fields.name_regional = reg_cand
+                        break
+
+        # Strategy B: Aadhaar letter address recipient line (following 'To')
+        recipient_name = None
+        for idx, line in enumerate(lines):
+            if line.strip().lower() == "to":
+                candidates = []
+                for offset in (1, 2, 3, 4):
+                    if idx + offset < len(lines):
+                        cand = lines[idx + offset].strip()
+                        if re.match(r'^(?:S[/\\:]|D[/\\:]|W[/\\:]|C[/\\:]|S\s*[\/\\:]|D\s*[\/\\:]|C\s*[\/\\:]|H\s*No|House|Plot|Flat|Son|Daughter|Wife|Care)', cand, re.IGNORECASE):
+                            break
+                        # If line has mostly non-ASCII (regional script), record regional and check next
+                        non_ascii_count = sum(1 for c in cand if ord(c) > 127)
+                        if non_ascii_count > len(cand) * 0.4:
+                            fields.name_regional = cand
+                            continue
+                        cand_clean = re.sub(r'[^A-Za-z\s\.]', '', cand).strip()
+                        if len(cand_clean.split()) >= 1 and len(cand_clean) >= 3:
+                            if not any(ign in cand_clean.upper().split() for ign in AADHAAR_IGNORE):
+                                candidates.append(cand_clean)
+                if candidates:
+                    # Prefer candidate with title-cased words and multi-word standard names
+                    candidates.sort(
+                        key=lambda c: (
+                            len(c.split()) >= 2,
+                            sum(1 for w in c.split() if w and w[0].isupper()),
+                            len(c)
+                        ),
+                        reverse=True
+                    )
+                    recipient_name = candidates[0]
+                    break
+
+        # Intra-Document Cross-Verification between Card Face and Letter Recipient
+        if card_name and recipient_name:
+            w_card = set(card_name.upper().split())
+            w_recip = set(recipient_name.upper().split())
+            inter = w_card.intersection(w_recip)
+            union = w_card.union(w_recip)
+            sim = len(inter) / float(len(union)) if union else 0.0
+
+            if sim < 0.50:
+                negatives.append(
+                    f"Identity Tampering / Intra-Document Conflict: Card face name '{card_name}' differs from letter recipient name '{recipient_name}'. "
+                    f"Physical credential erasure or digital text alteration detected."
+                )
+                fields.checksums_valid = False
+                fields.checksum_details = f"Intra-document identity mismatch: '{card_name}' vs '{recipient_name}'."
+                fields.name = card_name or recipient_name
+            else:
+                positives.append(f"Cardholder Identity: Extracted citizen name '{card_name}' verified consistent across credential face.")
+                fields.name = recipient_name if len(recipient_name) > len(card_name) else card_name
+        elif card_name:
+            fields.name = card_name
+            positives.append(f"Cardholder Identity: Extracted citizen name '{card_name}' from visual credential.")
+        elif recipient_name:
+            fields.name = recipient_name
+            positives.append(f"Cardholder Identity: Extracted recipient citizen name '{recipient_name}' from letter envelope.")
+
+        # Signature Block Check: Detect counterfeit 'Signature Valid' overlay
+        if re.search(r'Signatur(?:e|\w*)\s*(?:Valid|yalid|oy)?', text, re.IGNORECASE):
+            if "NOT VERIFIED" not in text.upper():
+                negatives.append("Signature Block Anomaly: 'Signature Valid' mark detected. Authentic unauthenticated UIDAI letters render 'Signature Not Verified'; premature 'Valid' marks indicate template mimicry.")
+
         if not fields.name:
             cls._extract_generic_fields(text, fields, positives, negatives)
 

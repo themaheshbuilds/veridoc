@@ -95,7 +95,13 @@
             </p>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
-            <span class="section-spec-count" id="session-badge-id">SESSION: READY</span>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span class="terra-badge" id="gemini-status-indicator" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.3); font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px;">
+                <span class="material-symbols-outlined" style="font-size: 14px;">neurology</span>
+                <span>Gemini 2.5 Flash Active</span>
+              </span>
+              <span class="section-spec-count" id="session-badge-id">SESSION: READY</span>
+            </div>
             <div class="execution-timer" id="execution-timer">
               <span class="material-symbols-outlined" style="font-size: 14px;">bolt</span>
               <span id="timer-display">Ready</span>
@@ -317,8 +323,10 @@
               </div>
 
               <div class="optical-viewport-container" id="doc-viewport-container">
-                <img id="active-document-image" src="" alt="Uploaded Document" class="optical-doc-img">
-                <div class="bbox-overlay-layer" id="bbox-overlay-layer"></div>
+                <div class="doc-img-wrapper" id="doc-img-wrapper">
+                  <img id="active-document-image" src="" alt="Uploaded Document" class="optical-doc-img">
+                  <div class="bbox-overlay-layer" id="bbox-overlay-layer"></div>
+                </div>
               </div>
 
               <!-- Legend -->
@@ -449,6 +457,18 @@
                     <span class="terra-badge verified" id="doc-qr-signature-badge">VALID_RSA_2048</span>
                   </div>
                   <div id="doc-qr-attestation-details" style="margin-top: 4px; color: #3b5245; line-height: 1.4;"></div>
+                </div>
+
+                <!-- Google Gemini Multimodal AI Audit Card -->
+                <div id="gemini-ai-audit-card" style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 4px; padding: 10px 12px; margin-bottom: 0.75rem; font-size: 11px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #1e3a8a;">
+                      <span class="material-symbols-outlined" style="font-size: 18px; color: #2563eb;">neurology</span>
+                      <span>Google Gemini Multimodal AI Vision Audit</span>
+                    </div>
+                    <span class="terra-badge" id="gemini-ai-status-badge" style="background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;">gemini-2.5-flash</span>
+                  </div>
+                  <div id="gemini-ai-findings-list" style="margin-top: 6px; color: #334155; line-height: 1.45;"></div>
                 </div>
 
                 <div id="uncertainty-banner" style="display: none; background: #fff8e6; border: 1px solid #d4a72c; border-radius: 4px; padding: 8px 12px; margin-bottom: 0.75rem; font-size: 11px; color: #855b00;">

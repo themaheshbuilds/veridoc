@@ -198,24 +198,106 @@ class OfficialRegistryService:
 
             if decompressed:
                 parts = decompressed.split(b'\xff')
-                if len(parts) >= 12:
+                if len(parts) >= 10:
                     result["format"] = "UIDAI Secure QR Code V2/V3 (RSA-2048 Signed)"
                     try:
-                        result["name"] = parts[2].decode('utf-8', errors='ignore').strip()
-                        result["dob"] = parts[3].decode('utf-8', errors='ignore').strip()
-                        result["gender"] = parts[4].decode('utf-8', errors='ignore').strip()
-                        result["care_of"] = parts[5].decode('utf-8', errors='ignore').strip()
-                        dist = parts[6].decode('utf-8', errors='ignore').strip()
-                        result["pincode"] = parts[10].decode('utf-8', errors='ignore').strip()
-                        result["state"] = parts[12].decode('utf-8', errors='ignore').strip()
-                        vtc = parts[15].decode('utf-8', errors='ignore').strip() if len(parts) > 15 else ""
-                        addr_parts = [p for p in [result["care_of"], vtc, dist, result["state"], result["pincode"]] if p]
-                        result["address"] = ", ".join(addr_parts)
-                        ref_id = parts[1].decode('utf-8', errors='ignore').strip()
-                        if len(ref_id) >= 4:
+                        decoded = []
+                        for p in parts:
+                            try:
+                                decoded.append(p.decode('utf-8').strip())
+                            except UnicodeDecodeError:
+                                decoded.append(p.decode('ISO-8859-1', errors='ignore').strip())
+
+                        # Check if first item is a Version marker (e.g. 'V2', 'V3' or 'V' + digit)
+                        p0 = decoded[0] if len(decoded) > 0 else ""
+                        p2 = decoded[2] if len(decoded) > 2 else ""
+
+                        is_v2_v3 = False
+                        if p0.startswith("V") and len(p0) <= 4 and any(c.isdigit() for c in p0):
+                            is_v2_v3 = True
+                        elif len(p2) >= 12 and p2.isdigit():
+                            # In V2/V3: index 0 is version, index 1 is email/mobile status (1-3), index 2 is reference ID (digits)
+                            is_v2_v3 = True
+
+                        if is_v2_v3:
+                            # UIDAI V2/V3 standard mapping
+                            ref_id = decoded[2] if len(decoded) > 2 else ""
+                            name = decoded[3] if len(decoded) > 3 else ""
+                            dob = decoded[4] if len(decoded) > 4 else ""
+                            gender_val = decoded[5] if len(decoded) > 5 else ""
+                            care_of = decoded[6] if len(decoded) > 6 else ""
+                            district = decoded[7] if len(decoded) > 7 else ""
+                            landmark = decoded[8] if len(decoded) > 8 else ""
+                            house = decoded[9] if len(decoded) > 9 else ""
+                            location = decoded[10] if len(decoded) > 10 else ""
+                            pincode = decoded[11] if len(decoded) > 11 else ""
+                            postoffice = decoded[12] if len(decoded) > 12 else ""
+                            state = decoded[13] if len(decoded) > 13 else ""
+                            street = decoded[14] if len(decoded) > 14 else ""
+                            subdistrict = decoded[15] if len(decoded) > 15 else ""
+                            vtc = decoded[16] if len(decoded) > 16 else ""
+                        else:
+                            # UIDAI V1 standard mapping
+                            ref_id = decoded[1] if len(decoded) > 1 else ""
+                            name = decoded[2] if len(decoded) > 2 else ""
+                            dob = decoded[3] if len(decoded) > 3 else ""
+                            gender_val = decoded[4] if len(decoded) > 4 else ""
+                            care_of = decoded[5] if len(decoded) > 5 else ""
+                            district = decoded[6] if len(decoded) > 6 else ""
+                            landmark = decoded[7] if len(decoded) > 7 else ""
+                            house = decoded[8] if len(decoded) > 8 else ""
+                            location = decoded[9] if len(decoded) > 9 else ""
+                            pincode = decoded[10] if len(decoded) > 10 else ""
+                            postoffice = decoded[11] if len(decoded) > 11 else ""
+                            state = decoded[12] if len(decoded) > 12 else ""
+                            street = decoded[13] if len(decoded) > 13 else ""
+                            subdistrict = decoded[14] if len(decoded) > 14 else ""
+                            vtc = decoded[15] if len(decoded) > 15 else ""
+
+                        # Fallback pin code scan: if pincode is not 6 digits, locate 6-digit pin in surrounding elements
+                        if not re.match(r'^\d{6}$', pincode):
+                            for cand in decoded[7:16]:
+                                if re.match(r'^\d{6}$', cand):
+                                    pincode = cand
+                                    break
+
+                        # Normalize gender
+                        g_upper = gender_val.strip().upper()
+                        if g_upper in ["M", "MALE"]:
+                            norm_gender = "MALE"
+                        elif g_upper in ["F", "FEMALE"]:
+                            norm_gender = "FEMALE"
+                        elif g_upper in ["T", "TRANSGENDER", "OTHER"]:
+                            norm_gender = "TRANSGENDER"
+                        else:
+                            norm_gender = g_upper
+
+                        result["name"] = name
+                        result["dob"] = dob
+                        result["gender"] = norm_gender
+                        result["care_of"] = care_of
+                        result["district"] = district
+                        result["landmark"] = landmark
+                        result["house"] = house
+                        result["location"] = location
+                        result["pincode"] = pincode
+                        result["postoffice"] = postoffice
+                        result["state"] = state
+                        result["street"] = street
+                        result["subdistrict"] = subdistrict
+                        result["vtc"] = vtc
+
+                        addr_parts = [p for p in [care_of, house, street, landmark, location, vtc, subdistrict, district, state, pincode] if p]
+                        result["address"] = ", ".join(addr_parts) if addr_parts else "Registered Address on file"
+
+                        # Extract masked Aadhaar from reference ID (first 4 characters are last 4 digits of Aadhaar)
+                        if len(ref_id) >= 4 and ref_id[:4].isdigit():
                             result["masked_aadhaar"] = f"XXXX-XXXX-{ref_id[:4]}"
-                    except Exception:
-                        pass
+                        elif len(ref_id) >= 4:
+                            result["masked_aadhaar"] = f"XXXX-XXXX-{ref_id[-4:]}"
+                    except Exception as parse_err:
+                        logger.warning(f"Error parsing decompressed Aadhaar QR fields: {parse_err}")
+
                 result["signature_verified"] = True
                 result["verification_status"] = "OFFICIAL_VERIFIED"
                 result["signature_algorithm"] = "RSA-2048 / SHA-256 (UIDAI Sovereign HSM Root)"

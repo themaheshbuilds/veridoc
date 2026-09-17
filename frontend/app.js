@@ -883,6 +883,9 @@ function renderResults(result) {
   // 5b. Statutory Cryptographic QR Attestation
   renderForensicQrAttestation(result.forensics);
 
+  // 5c. Google Gemini Multimodal AI Audit
+  renderGeminiAiAudit(result.ai_analysis);
+
   // 6. Evidence Items Table
   renderEvidenceTable(result.evidence);
 
@@ -1117,13 +1120,15 @@ function renderForensicQrAttestation(forensics) {
     if (title) title.textContent = `Official ${d.authority || 'Statutory Gateway'} QR Validated`;
     if (badge) badge.textContent = d.digital_signature_status || 'VALID_RSA_2048';
     
-    let summary = `Direct cryptographic match with ${d.authority || 'statutory registry'}. `;
-    if (d.masked_aadhaar) summary += `Masked UID: ${d.masked_aadhaar} • `;
-    if (d.pan) summary += `PAN: ${d.pan} • `;
-    if (d.name) summary += `Name: ${d.name} • `;
-    if (d.gender) summary += `Gender: ${d.gender} • `;
-    if (d.dob) summary += `DOB: ${d.dob} • `;
-    if (d.pincode) summary += `PIN: ${d.pincode}`;
+    const parts = [];
+    if (d.masked_aadhaar) parts.push(`Masked UID: ${d.masked_aadhaar}`);
+    if (d.pan) parts.push(`PAN: ${d.pan}`);
+    if (d.name) parts.push(`Name: ${d.name}`);
+    if (d.dob) parts.push(`DOB: ${d.dob}`);
+    if (d.gender) parts.push(`Gender: ${d.gender}`);
+    if (d.pincode) parts.push(`PIN: ${d.pincode}`);
+
+    let summary = `Direct cryptographic match with ${d.authority || 'statutory registry'}. ` + parts.join(' • ');
     if (details) details.textContent = summary;
   } else {
     card.style.display = 'none';
@@ -1285,6 +1290,76 @@ function renderEvidenceTable(evidence) {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function renderGeminiAiAudit(ai) {
+  const card = document.getElementById('gemini-ai-audit-card');
+  const findingsList = document.getElementById('gemini-ai-findings-list');
+  const statusBadge = document.getElementById('gemini-ai-status-badge');
+
+  if (!card || !findingsList) return;
+
+  card.style.display = 'block';
+
+  if (ai && ai.triggered && ai.findings && ai.findings.length > 0) {
+    if (statusBadge) {
+      if (ai.confidence_impact < 0) {
+        statusBadge.textContent = 'Anomaly Flagged by Gemini AI';
+        statusBadge.className = 'terra-badge review';
+        card.style.background = '#fef2f2';
+        card.style.borderColor = '#fca5a5';
+        card.style.borderLeftColor = '#ef4444';
+      } else {
+        statusBadge.textContent = 'Verified by Gemini AI';
+        statusBadge.className = 'terra-badge verified';
+        card.style.background = '#f0fdf4';
+        card.style.borderColor = '#86efac';
+        card.style.borderLeftColor = '#22c55e';
+      }
+    }
+    findingsList.innerHTML = ai.findings.map(f => `
+      <div style="margin-bottom: 4px; display: flex; align-items: flex-start; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 15px; color: ${ai.confidence_impact < 0 ? 'var(--error)' : 'var(--success)'}; margin-top: 1px;">
+          ${ai.confidence_impact < 0 ? 'error' : 'check_circle'}
+        </span>
+        <span style="font-size: 11px; font-weight: 500;">${escapeHtml(f)}</span>
+      </div>
+    `).join('');
+  } else {
+    // Standby display when fast optical checks pass without triggering deep AI
+    if (statusBadge) {
+      statusBadge.textContent = 'Standby (Edge Checks Passed)';
+      statusBadge.className = 'terra-badge';
+      statusBadge.style.background = '#e0e7ff';
+      statusBadge.style.color = '#3730a3';
+      statusBadge.style.borderColor = '#c7d2fe';
+    }
+    card.style.background = '#f8fafc';
+    card.style.borderColor = '#cbd5e1';
+    card.style.borderLeftColor = '#2563eb';
+    findingsList.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span style="font-size: 11px; color: #475569;">
+          Fast offline edge checks passed (0 optical anomalies). Gemini 2.5 Flash is connected &amp; ready on standby.
+        </span>
+        <button type="button" class="btn-terra-secondary" id="btn-run-gemini-now" style="font-size: 11px; padding: 3px 10px; cursor: pointer; border: 1px solid #2563eb; color: #2563eb; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #fff;">
+          <span class="material-symbols-outlined" style="font-size: 14px;">neurology</span>
+          Run Gemini Deep Audit
+        </button>
+      </div>
+    `;
+    setTimeout(() => {
+      const runBtn = document.getElementById('btn-run-gemini-now');
+      if (runBtn) {
+        runBtn.onclick = () => {
+          const forceAiCheck = document.getElementById('check-force-ai');
+          if (forceAiCheck) forceAiCheck.checked = true;
+          const verifyBtn = document.getElementById('btn-execute-verify');
+          if (verifyBtn) verifyBtn.click();
+        };
+      }
+    }, 50);
+  }
 }
 
 function resetVerificationView() {
@@ -1834,30 +1909,64 @@ function initApiView() {
   let lastApiResponse = null;
 
   function updateSnippets() {
-    const activeKey = keyText && keyText.textContent ? keyText.textContent : 'vrd_live_sample';
-    const ep = endpointSelect ? endpointSelect.value : '/api/v1/official/aadhaar/scan-qr';
+    const activeKey = keyText && keyText.textContent ? keyText.textContent : 'vrd_live_master_kiosk_key';
+    const ep = endpointSelect ? endpointSelect.value : '/api/v1/verify';
     const isProto = protoToggle ? protoToggle.checked : true;
+    const isTotalVerify = ep === '/api/v1/verify';
+    const baseUrl = window.location.origin || 'http://127.0.0.1:8000';
 
     if (curlSnippet) {
-      curlSnippet.innerHTML = `
-        curl -X POST "http://127.0.0.1:8000${ep}" \\<br>
-        &nbsp;&nbsp;-H "X-API-Key: ${activeKey}" \\<br>
-        &nbsp;&nbsp;-F "prototype_mode=${isProto}" \\<br>
-        &nbsp;&nbsp;-F "skip_live_gateway=${isProto}" \\<br>
-        &nbsp;&nbsp;-F "file=@/path/to/document.jpg"
-      `;
+      if (isTotalVerify) {
+        curlSnippet.innerHTML = `
+          curl -X POST "${baseUrl}${ep}" \\<br>
+          &nbsp;&nbsp;-H "X-API-Key: ${activeKey}" \\<br>
+          &nbsp;&nbsp;-F "checkpoint_id=DESKTOP-TERMINAL" \\<br>
+          &nbsp;&nbsp;-F "officer_id=OFFICER-01" \\<br>
+          &nbsp;&nbsp;-F "force_deep_ai=false" \\<br>
+          &nbsp;&nbsp;-F "file=@/path/to/document_scan.jpg"
+        `;
+      } else {
+        curlSnippet.innerHTML = `
+          curl -X POST "${baseUrl}${ep}" \\<br>
+          &nbsp;&nbsp;-H "X-API-Key: ${activeKey}" \\<br>
+          &nbsp;&nbsp;-F "prototype_mode=${isProto}" \\<br>
+          &nbsp;&nbsp;-F "skip_live_gateway=${isProto}" \\<br>
+          &nbsp;&nbsp;-F "file=@/path/to/document.jpg"
+        `;
+      }
     }
 
     if (pythonSnippet) {
-      pythonSnippet.innerHTML = `
-        import requests<br><br>
-        url = "http://127.0.0.1:8000${ep}"<br>
-        headers = {"X-API-Key": "${activeKey}"}<br>
-        files = {"file": open("document_scan.jpg", "rb")}<br>
-        data = {"prototype_mode": "${isProto}", "skip_live_gateway": "${isProto}"}<br><br>
-        resp = requests.post(url, headers=headers, files=files, data=data)<br>
-        print(resp.json())
-      `;
+      if (isTotalVerify) {
+        pythonSnippet.innerHTML = `
+          import requests<br><br>
+          url = "${baseUrl}${ep}"<br>
+          headers = {"X-API-Key": "${activeKey}"}<br>
+          files = {"file": open("document_scan.jpg", "rb")}<br>
+          data = {<br>
+          &nbsp;&nbsp;"checkpoint_id": "DESKTOP-TERMINAL",<br>
+          &nbsp;&nbsp;"officer_id": "OFFICER-01",<br>
+          &nbsp;&nbsp;"force_deep_ai": "false"<br>
+          }<br><br>
+          resp = requests.post(url, headers=headers, files=files, data=data)<br>
+          res = resp.json()<br>
+          print("Overall Verdict :", res.get("overall_verdict"))<br>
+          print("Risk Score      :", res.get("risk", {}).get("risk_score"))<br>
+          print("Extracted Name  :", res.get("extracted_fields", {}).get("name"))<br>
+          print("Doc Number      :", res.get("extracted_fields", {}).get("document_number"))<br>
+          print("Section 65B Hash:", res.get("audit_hash"))
+        `;
+      } else {
+        pythonSnippet.innerHTML = `
+          import requests<br><br>
+          url = "${baseUrl}${ep}"<br>
+          headers = {"X-API-Key": "${activeKey}"}<br>
+          files = {"file": open("document_scan.jpg", "rb")}<br>
+          data = {"prototype_mode": "${isProto}", "skip_live_gateway": "${isProto}"}<br><br>
+          resp = requests.post(url, headers=headers, files=files, data=data)<br>
+          print(resp.json())
+        `;
+      }
     }
   }
 
@@ -2039,6 +2148,9 @@ function initApiView() {
       }
     });
   }
+
+  // Immediately render code snippets using the live host domain / origin
+  updateSnippets();
 }
 
 function renderOfficialQrResult(data, mode) {

@@ -131,9 +131,9 @@
                 Target API Endpoint
               </label>
               <select id="api-endpoint-select" class="terra-input" style="width: 100%; cursor: pointer;">
-                <option value="/api/v1/official/aadhaar/scan-qr">POST /api/v1/official/aadhaar/scan-qr (UIDAI Aadhaar Verification)</option>
-                <option value="/api/v1/official/pan/scan-qr">POST /api/v1/official/pan/scan-qr (NSDL / CBDT PAN Verification)</option>
-                <option value="/api/v1/verify">POST /api/v1/verify (Full AI Vision &amp; Forensic Document Pipeline)</option>
+                <option value="/api/v1/verify" selected>POST /api/v1/verify (TOTAL Document Verification: OCR + ELA + Face + Checksums + Gemini AI)</option>
+                <option value="/api/v1/official/aadhaar/scan-qr">POST /api/v1/official/aadhaar/scan-qr (UIDAI Aadhaar Secure QR Only)</option>
+                <option value="/api/v1/official/pan/scan-qr">POST /api/v1/official/pan/scan-qr (NSDL / CBDT PAN QR Only)</option>
               </select>
             </div>
 
@@ -166,6 +166,26 @@
               <button class="specimen-pill-btn api-specimen-btn" data-specimen="pan_altered" style="border-color: rgba(184, 50, 48, 0.3);">
                 <span class="material-symbols-outlined" style="font-size: 15px; color: var(--error);">gpp_maybe</span>
                 <span>Altered PAN (Syntax Discrepancy)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="passport_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Genuine Passport (ICAO 9303)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="passport_altered" style="border-color: rgba(184, 50, 48, 0.3);">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--error);">gpp_maybe</span>
+                <span>Altered Passport (MRZ Tampered)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="dl_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Driving License (MoRTH Sarathi)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="voter_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Voter ID (ECI EPIC)</span>
+              </button>
+              <button class="specimen-pill-btn api-specimen-btn" data-specimen="marksheet_genuine">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--success);">check_circle</span>
+                <span>Academic Degree / Marksheet</span>
               </button>
             </div>
           </div>
@@ -250,29 +270,38 @@
           <!-- Code Integration Snippets -->
           <div>
             <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
-              cURL Integration Command:
+              cURL Integration Command (Total Document Verification):
             </span>
             <div class="code-box-terra" id="curl-code-snippet">
-              curl -X POST "http://127.0.0.1:8000/api/v1/official/aadhaar/scan-qr" \<br>
-              &nbsp;&nbsp;-H "X-API-Key: veridoc_live_sample" \<br>
-              &nbsp;&nbsp;-F "skip_live_gateway=true" \<br>
-              &nbsp;&nbsp;-F "file=@/path/to/aadhaar_document.jpg"
+              curl -X POST "http://127.0.0.1:8000/api/v1/verify" \<br>
+              &nbsp;&nbsp;-H "X-API-Key: vrd_live_master_kiosk_key" \<br>
+              &nbsp;&nbsp;-F "checkpoint_id=DESKTOP-TERMINAL" \<br>
+              &nbsp;&nbsp;-F "officer_id=OFFICER-01" \<br>
+              &nbsp;&nbsp;-F "force_deep_ai=false" \<br>
+              &nbsp;&nbsp;-F "file=@/path/to/document_scan.jpg"
             </div>
           </div>
 
           <!-- Python Snippet -->
           <div>
             <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px;">
-              Python requests Example:
+              Python requests Example (Total Document Verification):
             </span>
             <div class="code-box-terra" id="python-code-snippet">
               import requests<br><br>
-              url = "http://127.0.0.1:8000/api/v1/official/aadhaar/scan-qr"<br>
-              files = {"file": open("aadhaar_card.jpg", "rb")}<br>
-              data = {"skip_live_gateway": "true", "prototype_mode": "true"}<br><br>
-              response = requests.post(url, files=files, data=data)<br>
-              result = response.json()<br>
-              print(f"Status: {result['verification_status']}, Citizen: {result.get('name')}")
+              url = "http://127.0.0.1:8000/api/v1/verify"<br>
+              headers = {"X-API-Key": "vrd_live_master_kiosk_key"}<br>
+              files = {"file": open("document_scan.jpg", "rb")}<br>
+              data = {<br>
+              &nbsp;&nbsp;"checkpoint_id": "DESKTOP-TERMINAL",<br>
+              &nbsp;&nbsp;"officer_id": "OFFICER-01",<br>
+              &nbsp;&nbsp;"force_deep_ai": "false"<br>
+              }<br><br>
+              resp = requests.post(url, headers=headers, files=files, data=data)<br>
+              result = resp.json()<br>
+              print(f"Verdict: {result['overall_verdict']}")<br>
+              print(f"Risk Score: {result['risk']['risk_score']}/100")<br>
+              print(f"Extracted: {result['extracted_fields']['name']}, UID: {result['extracted_fields']['document_number']}")
             </div>
           </div>
 

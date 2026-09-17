@@ -17,7 +17,7 @@ class ForensicAnalyzer:
     # ELA constants
     ELA_QUALITY = 90
     ELA_DIFF_THRESHOLD = 60
-    ANOMALY_CLUSTER_MIN_AREA = 1200
+    ANOMALY_CLUSTER_MIN_AREA = 250
 
     @classmethod
     def analyze_image(
@@ -38,7 +38,7 @@ class ForensicAnalyzer:
         suspicious_regions.extend(ela_boxes)
 
         tampering_detected = False
-        if ela_score > 0.32 or len(ela_boxes) > 0:
+        if ela_score > 0.03 or len(ela_boxes) > 0:
             tampering_detected = True
             findings.append(
                 f"ELA Forensics: Quantization anomaly detected ({ela_score*100:.1f}% deviation). "
@@ -106,6 +106,8 @@ class ForensicAnalyzer:
             face_boxes=face_boxes,
             qr_detected=qr_detected,
             qr_boxes=qr_boxes,
+            qr_payload=qr_payloads[0] if qr_payloads else None,
+            qr_payloads=qr_payloads,
             qr_decoded_data=qr_decoded_data,
             barcode_detected=barcode_detected,
             barcode_boxes=barcode_boxes,
@@ -192,7 +194,7 @@ class ForensicAnalyzer:
                     cv2.drawContours(mask, [cnt], -1, 255, -1)
                     roi_mean = cv2.mean(gray_diff, mask=mask)[0]
 
-                    if roi_mean > (baseline_mean + 2.5 * baseline_std):
+                    if roi_mean > (baseline_mean + 1.8 * baseline_std):
                         x, y, bw, bh = cv2.boundingRect(cnt)
                         # Convert to normalized percentage (0-100%) for responsive frontend rendering
                         norm_x = round((x / w) * 100, 2)
@@ -244,38 +246,110 @@ class ForensicAnalyzer:
 
     @classmethod
     def _detect_faces(cls, cv_img: np.ndarray) -> List[BoundingBox]:
-        """Detect faces on ID document using OpenCV Haar Cascade."""
-        try:
-            h, w = cv_img.shape[:2]
-            gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-            gray = cv2.equalizeHist(gray)
-
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            face_cascade = cv2.CascadeClassifier(cascade_path)
-
-            faces = face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=4,
-                minSize=(int(w * 0.08), int(h * 0.08))
-            )
-
-            boxes: List[BoundingBox] = []
-            for (x, y, bw, bh) in faces:
-                boxes.append(
-                    BoundingBox(
-                        x=round((x / w) * 100, 2),
-                        y=round((y / h) * 100, 2),
-                        width=round((bw / w) * 100, 2),
-                        height=round((bh / h) * 100, 2),
-                        label="FACE_PORTRAIT",
-                        severity="PASS",
-                        details="Detected identity portrait frame."
-                    )
-                )
-            return boxes
-        except Exception:
+        """
+        Detect citizen biometric portrait on ID credential.
+        Multi-tier implementation:
+          1. Windows Media FaceDetector (built-in, hardware-accelerated, robust on all cards & A4 letters)
+          2. OpenCV Haar Cascade (fallback if CascadeClassifier is compiled)
+        """
+        if cv_img is None:
             return []
+
+        h, w = cv_img.shape[:2]
+        boxes: List[BoundingBox] = []
+
+        # Strategy 1: Windows Media FaceDetector (high accuracy & speed ~190ms)
+        try:
+            import asyncio
+            import concurrent.futures
+            import winsdk.windows.media.faceanalysis as fa
+            import winsdk.windows.graphics.imaging as imaging
+            import winsdk.windows.storage.streams as streams
+
+            regions = [(0, 0, w, h)]
+            if h > 1500 and h / float(w) > 1.2:
+                # Targeted scan for bottom cut-out card on Aadhaar/Govt letter forms
+                regions.append((0, int(h * 0.6), int(w * 0.55), h))
+                regions.append((int(w * 0.45), int(h * 0.6), w, h))
+
+            async def _detect_in_crop(crop_bytes):
+                detector = await fa.FaceDetector.create_async()
+                stream = streams.InMemoryRandomAccessStream()
+                writer = streams.DataWriter(stream.get_output_stream_at(0))
+                writer.write_bytes(crop_bytes)
+                await writer.store_async()
+                await writer.flush_async()
+
+                decoder = await imaging.BitmapDecoder.create_async(stream)
+                sb = await decoder.get_software_bitmap_async()
+                if sb.bitmap_pixel_format not in (imaging.BitmapPixelFormat.GRAY8, imaging.BitmapPixelFormat.NV12):
+                    sb = imaging.SoftwareBitmap.convert(sb, imaging.BitmapPixelFormat.GRAY8)
+
+                return await detector.detect_faces_async(sb)
+
+            for rx1, ry1, rx2, ry2 in regions:
+                crop = cv_img[ry1:ry2, rx1:rx2]
+                _, enc = cv2.imencode(".jpg", crop)
+                crop_bytes = enc.tobytes()
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(lambda: asyncio.run(_detect_in_crop(crop_bytes)))
+                    win_faces = future.result()
+
+                if win_faces and len(win_faces) > 0:
+                    for wf in win_faces:
+                        b = wf.face_box
+                        # A legitimate citizen identity portrait must have realistic photographic dimensions (min 45x45 px)
+                        if b.width < 45 or b.height < 45:
+                            continue
+                        abs_x = rx1 + b.x
+                        abs_y = ry1 + b.y
+                        boxes.append(
+                            BoundingBox(
+                                x=round((abs_x / w) * 100, 2),
+                                y=round((abs_y / h) * 100, 2),
+                                width=round((b.width / w) * 100, 2),
+                                height=round((b.height / h) * 100, 2),
+                                label="FACE_PORTRAIT",
+                                severity="PASS",
+                                details="Detected identity portrait frame."
+                            )
+                        )
+                    if boxes:
+                        return boxes
+        except Exception as win_err:
+            logger.debug(f"Windows face detection fallback: {win_err}")
+
+        # Strategy 2: OpenCV Haar Cascade (if available)
+        try:
+            if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+                gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                gray = cv2.equalizeHist(gray)
+                cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                face_cascade = cv2.CascadeClassifier(cascade_path)
+                faces = face_cascade.detectMultiScale(
+                    gray,
+                    scaleFactor=1.1,
+                    minNeighbors=4,
+                    minSize=(int(w * 0.05), int(h * 0.05))
+                )
+                for (x, y, bw, bh) in faces:
+                    boxes.append(
+                        BoundingBox(
+                            x=round((x / w) * 100, 2),
+                            y=round((y / h) * 100, 2),
+                            width=round((bw / w) * 100, 2),
+                            height=round((bh / h) * 100, 2),
+                            label="FACE_PORTRAIT",
+                            severity="PASS",
+                            details="Detected identity portrait frame."
+                        )
+                    )
+                return boxes
+        except Exception:
+            pass
+
+        return []
 
     @classmethod
     def _detect_barcodes_and_qr(
@@ -309,6 +383,21 @@ class ForensicAnalyzer:
                 if barcodes:
                     for b in barcodes:
                         text = b.text.strip() if b.text else ""
+                        if not text and hasattr(b, 'bytes') and b.bytes:
+                            raw = bytes(b.bytes)
+                            try:
+                                txt = raw.decode('utf-8', errors='ignore')
+                                if '<PrintLetterBarcodeData' in txt or 'uid=' in txt or 'PANQR:' in txt or 'uidai' in txt.lower():
+                                    text = txt.strip()
+                            except Exception:
+                                pass
+                            if not text:
+                                try:
+                                    big_int = int.from_bytes(raw, byteorder='big')
+                                    if big_int > 0 and len(str(big_int)) > 150:
+                                        text = str(big_int)
+                                except Exception:
+                                    pass
                         if text:
                             pos = b.position
                             xs = [pos.top_left.x, pos.top_right.x, pos.bottom_right.x, pos.bottom_left.x]

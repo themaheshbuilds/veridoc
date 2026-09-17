@@ -4,6 +4,8 @@ import json
 import logging
 import asyncio
 from typing import Optional, List, Dict, Any
+import numpy as np
+import cv2
 from PIL import Image
 
 from app.schemas.verification import AIAnalysisReport
@@ -50,7 +52,8 @@ class GeminiAuditorService:
         extracted_fields: Dict[str, Any],
         quality_summary: str,
         forensics_summary: str,
-        trigger_reasons: List[str]
+        trigger_reasons: List[str],
+        cv_img: Optional[Any] = None
     ) -> AIAnalysisReport:
         api_key = cls.get_api_key()
         reasons_str = "; ".join(trigger_reasons) if trigger_reasons else "Deep multi-modal forensic audit requested."
@@ -72,8 +75,43 @@ class GeminiAuditorService:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
 
-            # Load image from bytes and optimize resolution for high-speed analysis
-            img = Image.open(io.BytesIO(file_bytes))
+            # Load image safely across all formats (PDF, JPEG, PNG, WEBP, TIFF, or pre-rendered cv_img)
+            img = None
+            if cv_img is not None:
+                try:
+                    rgb = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+                    img = Image.fromarray(rgb)
+                except Exception as e_cv:
+                    logger.debug(f"cv_img conversion error: {e_cv}")
+
+            if img is None and file_bytes:
+                is_pdf = (filename and filename.lower().endswith(".pdf")) or (len(file_bytes) >= 4 and file_bytes[:4] == b"%PDF")
+                if is_pdf:
+                    try:
+                        import fitz
+                        doc = fitz.open(stream=file_bytes, filetype="pdf")
+                        if len(doc) > 0:
+                            page = doc[0]
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    except Exception as e_pdf:
+                        logger.debug(f"PyMuPDF PDF rendering error: {e_pdf}")
+
+                if img is None:
+                    try:
+                        img = Image.open(io.BytesIO(file_bytes))
+                    except Exception:
+                        try:
+                            nparr = np.frombuffer(file_bytes, np.uint8)
+                            decoded = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                            if decoded is not None:
+                                img = Image.fromarray(cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB))
+                        except Exception:
+                            pass
+
+            if img is None:
+                raise ValueError(f"Unable to decode document '{filename}' into an image for multimodal vision analysis.")
+
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
             # Downscale large images to max 1024px while retaining forensic clarity for <2s inference
@@ -99,18 +137,27 @@ Return a brief, professional bulleted summary of your findings (maximum 3 concis
 Keep each bullet point under 120 characters for dashboard display.
 """
 
-            # Primary fast multimodal models
-            candidate_models = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
+            # Primary fast multimodal models with resilient quota fallback
+            candidate_models = [
+                "gemini-2.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash",
+                "gemini-flash-latest"
+            ]
             response = None
 
             for m_name in candidate_models:
                 try:
                     model = genai.GenerativeModel(m_name)
-                    response = await asyncio.to_thread(model.generate_content, [prompt, img])
+                    response = await asyncio.wait_for(
+                        asyncio.to_thread(model.generate_content, [prompt, img]),
+                        timeout=35.0
+                    )
                     if response and response.text:
                         break
                 except Exception as ex:
-                    logger.warning(f"Auditor model '{m_name}' error: {ex}")
+                    logger.warning(f"Auditor model '{m_name}' error: {repr(ex)}")
                     continue
 
             text_resp = response.text.strip() if response and response.text else "Multimodal visual inspection completed."

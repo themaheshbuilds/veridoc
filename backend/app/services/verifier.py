@@ -161,12 +161,11 @@ class VerificationService:
                 preview_image_base64=preview_image_base64
             )
 
-        # Apply CLAHE + 4-point perspective deskew before forensic analysis
+        # Apply CLAHE contrast enhancement for forensic analysis without altering coordinate space
         try:
             cv_img = DocumentQualityAssessor.apply_clahe(cv_img)
-            cv_img, deskewed = DocumentQualityAssessor.deskew_perspective(cv_img)
         except Exception:
-            deskewed = False
+            pass
 
         # ----------------------------------------------------------------------
         # Stage 2: Computer Vision Forensics (ELA, Face, QR)
@@ -182,8 +181,8 @@ class VerificationService:
         ocr_result = await DocumentAnalyzer.extract_ocr_result(file_bytes, filename)
         raw_text = ocr_result.text
 
-        qr_payload = None
-        if forensic_report.qr_detected and forensic_report.qr_boxes:
+        qr_payload = forensic_report.qr_payload or (forensic_report.qr_payloads[0] if forensic_report.qr_payloads else None)
+        if not qr_payload and forensic_report.qr_detected and forensic_report.qr_boxes:
             details = forensic_report.qr_boxes[0].details or ""
             if ": " in details:
                 qr_payload = details.split(": ", 1)[1].strip()
@@ -195,12 +194,15 @@ class VerificationService:
             qr_payload = OfficialRegistryService.scan_qr_from_image(file_bytes)
             if qr_payload:
                 forensic_report.qr_detected = True
+                forensic_report.qr_payload = qr_payload
+                if not forensic_report.qr_payloads:
+                    forensic_report.qr_payloads = [qr_payload]
 
         if qr_payload:
             from app.services.official_registry import OfficialRegistryService
             clean_p = qr_payload.strip()
             if not forensic_report.qr_decoded_data:
-                if "<PrintLetterBarcodeData" in clean_p or (clean_p.isdigit() and len(clean_p) > 250):
+                if "<PrintLetterBarcodeData" in clean_p or (clean_p.isdigit() and len(clean_p) > 200):
                     dec = OfficialRegistryService.decode_and_verify_aadhaar_qr(clean_p)
                     if dec.get("status") == "OFFICIAL_VERIFIED" or dec.get("verification_status") == "OFFICIAL_VERIFIED":
                         forensic_report.qr_decoded_data = dec
@@ -216,10 +218,34 @@ class VerificationService:
             ocr_result=ocr_result
         )
 
+        if ocr_result and getattr(ocr_result, "engine_used", None) and raw_text and len(raw_text.strip()) > 10:
+            pos_factors.append(f"Visual Text Extraction: Optical recognition executed via {ocr_result.engine_used} (Confidence: {int(ocr_result.confidence * 100)}%).")
+
         if forensic_report.qr_decoded_data:
-            extracted_fields.qr_data_parsed = forensic_report.qr_decoded_data
+            qr_d = forensic_report.qr_decoded_data
+            extracted_fields.qr_data_parsed = qr_d
             if not extracted_fields.qr_payload:
                 extracted_fields.qr_payload = qr_payload
+
+            # Populate missing demographic fields from cryptographically verified QR code
+            if qr_d.get("status") == "OFFICIAL_VERIFIED" or qr_d.get("signature_verified"):
+                if not extracted_fields.name and qr_d.get("name"):
+                    extracted_fields.name = qr_d["name"]
+                    pos_factors.append(f"Statutory Identity Attestation: Citizen name '{qr_d['name']}' cryptographically certified by {qr_d.get('authority', 'statutory registry')}.")
+                if not extracted_fields.dob and qr_d.get("dob"):
+                    extracted_fields.dob = qr_d["dob"]
+                if not extracted_fields.gender and qr_d.get("gender"):
+                    extracted_fields.gender = qr_d["gender"]
+                if not extracted_fields.document_number and qr_d.get("masked_aadhaar"):
+                    extracted_fields.document_number = qr_d["masked_aadhaar"]
+                if not extracted_fields.care_of and qr_d.get("care_of"):
+                    extracted_fields.care_of = qr_d["care_of"]
+                if not extracted_fields.address and qr_d.get("address"):
+                    extracted_fields.address = qr_d["address"]
+                if not extracted_fields.pincode and qr_d.get("pincode"):
+                    extracted_fields.pincode = qr_d["pincode"]
+                if not extracted_fields.state and qr_d.get("state"):
+                    extracted_fields.state = qr_d["state"]
 
         # Link 1D optical barcode identifier if detected
         if forensic_report.barcode_detected and forensic_report.barcode_payload:
@@ -293,7 +319,8 @@ class VerificationService:
                 extracted_fields=extracted_fields.model_dump(),
                 quality_summary=f"Score: {quality_report.blur_score:.1f}, Verdict: {quality_report.quality_verdict}",
                 forensics_summary=f"ELA Discrepancy: {forensic_report.ela_anomaly_score*100:.1f}%, Tampered: {forensic_report.tampering_detected}",
-                trigger_reasons=ai_reasons
+                trigger_reasons=ai_reasons,
+                cv_img=cv_img
             )
         else:
             ai_analysis = AIAnalysisReport(
@@ -302,6 +329,15 @@ class VerificationService:
                 findings=[],
                 confidence_impact=0.0
             )
+
+        # Integrate Gemini Multimodal AI findings into evidence factors
+        if ai_analysis and ai_analysis.triggered and ai_analysis.findings:
+            if ai_analysis.confidence_impact < 0:
+                for finding in ai_analysis.findings:
+                    if not any(finding[:25].lower() in nf.lower() for nf in neg_factors):
+                        neg_factors.append(f"Gemini AI Forensic Inspection: {finding}")
+            elif ai_analysis.confidence_impact > 0:
+                pos_factors.append(f"Gemini AI Multimodal Verification: {ai_analysis.findings[0]}")
 
         # ----------------------------------------------------------------------
         # Stage 5: Evidence Aggregation & Risk Scoring (0 to 100)
@@ -402,6 +438,13 @@ class VerificationService:
             )
 
         # 5. Facial Biometric Photo
+        photo_id_types = (
+            DocumentType.AADHAAR,
+            DocumentType.PASSPORT,
+            DocumentType.DRIVING_LICENSE,
+            DocumentType.PAN,
+            DocumentType.VOTER_ID,
+        )
         if forensic_report.face_detected:
             evidence_items.append(
                 EvidenceItem(
@@ -412,8 +455,27 @@ class VerificationService:
                     confidence=0.94,
                     summary=f"Detected {forensic_report.face_count} frontal facial portrait(s) matching credential layout.",
                     provenance=Provenance(
-                        engine_id="OPENCV-HAAR-CASCADE",
-                        algorithm="HAARCASCADE_FRONTALFACE_DEFAULT",
+                        engine_id="WINDOWS-MEDIA-FACE-DETECTOR",
+                        algorithm="FACEDETECTOR_HIGH_PERFORMANCE",
+                        duration_ms=30.0
+                    )
+                ).seal()
+            )
+        elif doc_type in photo_id_types:
+            neg_factors.append(
+                f"Biometric Portrait Anomaly: No valid citizen frontal portrait detected on {doc_type.value} credential (photo may be obscured, defaced, tampered, or missing)."
+            )
+            evidence_items.append(
+                EvidenceItem(
+                    check_id="CHK-BIO-05",
+                    check_name="Citizen Facial Portrait Verification",
+                    source_type=SourceType.FORENSIC,
+                    status=EvidenceStatus.FAIL,
+                    confidence=0.92,
+                    summary=f"Missing or defaced biometric portrait on {doc_type.value} credential. Frontal face recognition returned 0 valid faces.",
+                    provenance=Provenance(
+                        engine_id="WINDOWS-MEDIA-FACE-DETECTOR",
+                        algorithm="FACEDETECTOR_HIGH_PERFORMANCE",
                         duration_ms=30.0
                     )
                 ).seal()
@@ -456,6 +518,25 @@ class VerificationService:
                 ).seal()
             )
 
+        # 7. Google Gemini Multimodal AI Vision Audit Evidence
+        if ai_analysis and ai_analysis.triggered and ai_analysis.findings:
+            ai_status = EvidenceStatus.FAIL if ai_analysis.confidence_impact < 0 else EvidenceStatus.PASS
+            evidence_items.append(
+                EvidenceItem(
+                    check_id="CHK-AI-GEMINI-07",
+                    check_name="Google Gemini Multimodal Vision Forensics",
+                    source_type=SourceType.AI,
+                    status=ai_status,
+                    confidence=0.96,
+                    summary="; ".join(ai_analysis.findings[:2]),
+                    provenance=Provenance(
+                        engine_id="GOOGLE-GEMINI-2.5-FLASH",
+                        algorithm="MULTIMODAL_VISION_FORENSIC_AUDITOR",
+                        duration_ms=round((t_forensic_end - t_forensic_start) * 1000, 1)
+                    )
+                ).seal()
+            )
+
         # Compute dynamic risk score (0 to 100)
         risk_score = 4.0
         if forensic_report.tampering_detected:
@@ -465,8 +546,12 @@ class VerificationService:
             risk_score += 45.0
         elif extracted_fields.checksums_valid is True:
             risk_score = max(0.0, risk_score - 4.0)
-        if any("Mismatch" in f or "Conflict" in f for f in neg_factors):
+        if any("Mismatch" in f or "Conflict" in f or "Tampering" in f for f in neg_factors):
             risk_score += 38.0
+        if any("Biometric" in f or "Portrait" in f for f in neg_factors):
+            risk_score += 35.0
+        if any("Signature" in f or "Mimicry" in f for f in neg_factors):
+            risk_score += 25.0
         if any("future" in f.lower() or "expired" in f.lower() for f in neg_factors):
             risk_score += 15.0
         if quality_report.quality_verdict == "ACCEPTABLE":
@@ -475,7 +560,10 @@ class VerificationService:
         # Check for physical document tampering, mathematical failure, or OCR-QR cross-field mismatch
         has_physical_tamper = (
             extracted_fields.checksums_valid is False
-            or any("Mismatch" in f or "Conflict" in f or "Failure" in f for f in neg_factors)
+            or any(
+                "Mismatch" in f or "Conflict" in f or "Failure" in f or "Tampering" in f or "Anomaly" in f or "Mimicry" in f
+                for f in neg_factors
+            )
             or forensic_report.tampering_detected
         )
 
@@ -499,7 +587,7 @@ class VerificationService:
         confidence_score = 92.0
         if quality_report.quality_verdict == "ACCEPTABLE":
             confidence_score -= 10.0
-        if not forensic_report.face_detected and doc_type == DocumentType.PASSPORT:
+        if not forensic_report.face_detected and doc_type in photo_id_types:
             confidence_score -= 8.0
         if ai_analysis and ai_analysis.triggered:
             confidence_score += ai_analysis.confidence_impact
@@ -517,19 +605,17 @@ class VerificationService:
                 f"Official Statutory Cryptographic QR Verified: {forensic_report.qr_decoded_data.get('authority', 'Statutory Authority')} "
                 f"({forensic_report.qr_decoded_data.get('digital_signature_status', 'VALID')}). Identity mathematically confirmed under Section 65B."
             )
-        elif has_physical_tamper and (extracted_fields.checksums_valid is False or any("Mismatch" in f or "Conflict" in f or "Failure" in f for f in neg_factors)):
+        elif has_physical_tamper:
             overall_verdict = OverallVerdict.SUSPICIOUS
             risk_level = RiskLevel.HIGH
             recommendation = OfficerAction.SECONDARY_INSPECTION
             status_label = "High Risk"
             risk_score = max(risk_score, 85.0)
-            tamper_reason = "Physical credential details conflict with cryptographic barcode payload or fail mathematical check digits."
-            if extracted_fields.checksums_valid is False:
-                tamper_reason = f"Visual credential sequence failed mathematical check digit: {extracted_fields.checksum_details or 'Verhoeff checksum violation'}."
-            elif any("Mismatch" in f or "Conflict" in f for f in neg_factors):
-                tamper_reason = "Critical mismatch between visual credential text and cryptographic QR barcode payload (composite/splicing forgery)."
+            tamper_reason = "; ".join(neg_factors[:2]) if neg_factors else "Document surface tampering or credential integrity violation detected."
+            if extracted_fields.checksums_valid is False and extracted_fields.checksum_details:
+                tamper_reason = f"Credential verification anomaly: {extracted_fields.checksum_details}."
             rationale = (
-                f"Physical Tampering / Composite Forgery Detected: {tamper_reason} "
+                f"Physical Tampering / Credential Anomaly Detected: {tamper_reason} "
                 f"Manual secondary inspection required under standard border security protocols."
             )
         elif extracted_fields.is_uncertain:
@@ -624,7 +710,7 @@ class VerificationService:
                 resolution_upscaled=prep_res.resolution_upscaled,
                 variants_tested=len(prep_res.variants),
                 selected_variant=ocr_result.selected_variant,
-                ocr_engine_used="Windows Media OCR + Multilingual Vision",
+                ocr_engine_used=getattr(ocr_result, "engine_used", "RapidOCR (ONNX Deep Learning Offline)"),
                 languages_detected=ocr_result.languages_detected,
                 enhanced_image_base64=prep_res.base64_preview
             )

@@ -24,6 +24,12 @@ try:
 except ImportError:
     HAS_WIN_OCR = False
 
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    HAS_RAPID_OCR = True
+except ImportError:
+    HAS_RAPID_OCR = False
+
 from app.services.image_preprocessor import DocumentPreprocessor, PreprocessingResult
 
 logger = logging.getLogger("veridoc.ocr")
@@ -48,7 +54,9 @@ class OCRResult:
         languages_detected: Optional[List[str]] = None,
         selected_variant: str = "clahe_enhanced",
         preprocessing_result: Optional[PreprocessingResult] = None,
-        structured_demographics: Optional[Dict[str, Any]] = None
+        structured_demographics: Optional[Dict[str, Any]] = None,
+        engine_used: str = "RapidOCR (ONNX Offline)",
+        bounding_boxes: Optional[List[Dict[str, Any]]] = None
     ):
         self.text = text
         self.confidence = confidence
@@ -59,6 +67,8 @@ class OCRResult:
         self.selected_variant = selected_variant
         self.preprocessing_result = preprocessing_result
         self.structured_demographics = structured_demographics or {}
+        self.engine_used = engine_used
+        self.bounding_boxes = bounding_boxes or []
 
 
 class OCREngine:
@@ -71,6 +81,81 @@ class OCREngine:
     """
 
     _ocr_engine_instance = None
+    _rapid_ocr_instance = None
+
+    @classmethod
+    def _get_rapid_ocr_engine(cls):
+        """Lazily initialize and cache RapidOCR ONNX engine."""
+        if not HAS_RAPID_OCR:
+            return None
+        if cls._rapid_ocr_instance is None:
+            try:
+                cls._rapid_ocr_instance = RapidOCR()
+                logger.info("RapidOCR (ONNX Deep Learning) engine successfully initialized.")
+            except Exception as e:
+                logger.warning(f"Failed to initialize RapidOCR ONNX engine: {e}")
+                cls._rapid_ocr_instance = None
+        return cls._rapid_ocr_instance
+
+    @classmethod
+    def recognize_with_rapid_ocr(cls, image_input: Any) -> Tuple[str, float, List[Dict[str, Any]]]:
+        """
+        Run RapidOCR (ONNX Deep Learning) on image bytes or cv2 numpy array.
+        Returns:
+            Tuple of (extracted_text, average_confidence, bounding_boxes)
+        """
+        engine = cls._get_rapid_ocr_engine()
+        if not engine:
+            return "", 0.0, []
+
+        try:
+            if isinstance(image_input, bytes):
+                nparr = np.frombuffer(image_input, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            else:
+                img = image_input
+
+            if img is None:
+                return "", 0.0, []
+
+            h, w = img.shape[:2]
+            scale = 1.0
+            if max(h, w) > 1400:
+                scale = 1400.0 / float(max(h, w))
+                img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+            ocr_res, elapse = engine(img)
+            if not ocr_res:
+                return "", 0.0, []
+
+            lines = []
+            scores = []
+            boxes_data = []
+
+            for item in ocr_res:
+                if len(item) >= 3:
+                    box, line_txt, score = item[0], item[1], float(item[2])
+                    if line_txt and str(line_txt).strip():
+                        clean_txt = str(line_txt).strip()
+                        lines.append(clean_txt)
+                        scores.append(score)
+                        # Box is a list of 4 points [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+                        b_list = box.tolist() if hasattr(box, 'tolist') else list(box)
+                        if scale != 1.0:
+                            inv_scale = 1.0 / scale
+                            b_list = [[round(pt[0] * inv_scale, 1), round(pt[1] * inv_scale, 1)] for pt in b_list]
+                        boxes_data.append({
+                            "text": clean_txt,
+                            "confidence": round(score, 4),
+                            "box": b_list
+                        })
+
+            full_text = "\n".join(lines).strip()
+            avg_score = float(np.mean(scores)) if scores else 0.0
+            return full_text, round(avg_score, 4), boxes_data
+        except Exception as e:
+            logger.warning(f"RapidOCR recognition error: {e}")
+            return "", 0.0, []
 
     @classmethod
     def _get_win_ocr_engine(cls):
@@ -317,7 +402,63 @@ class OCREngine:
         preproc = DocumentPreprocessor.preprocess_document_image(file_bytes, filename)
 
         # ----------------------------------------------------------------------
-        # Primary: High-Precision Multilingual AI OCR (Gemini Vision Multi-Model)
+        # Primary Tier: RapidOCR (100% Offline Deep Learning via ONNX Runtime)
+        # ----------------------------------------------------------------------
+        rapid_engine = cls._get_rapid_ocr_engine()
+        if rapid_engine:
+            best_rapid_text = ""
+            best_rapid_score = -1.0
+            best_rapid_variant = "clahe_enhanced"
+            best_rapid_boxes = []
+
+            # Prioritize primary contrast-enhanced and denoised variants first
+            variant_order = ["clahe_enhanced", "denoised_sharpened", "grayscale_clahe", "adaptive_binarized"]
+            ordered_variants = []
+            for v_key in variant_order:
+                if v_key in preproc.variants:
+                    ordered_variants.append((v_key, preproc.variants[v_key]))
+            for v_key, v_bytes in preproc.variants.items():
+                if (v_key, v_bytes) not in ordered_variants:
+                    ordered_variants.append((v_key, v_bytes))
+
+            for var_name, var_bytes in ordered_variants:
+                cand_text, cand_conf, cand_boxes = cls.recognize_with_rapid_ocr(var_bytes)
+                eval_score = cls._evaluate_ocr_quality(cand_text)
+                combined_score = (0.5 * cand_conf) + (0.5 * eval_score) if cand_conf > 0 else eval_score
+
+                logger.debug(f"RapidOCR variant '{var_name}' score: {combined_score:.2f}, chars: {len(cand_text)}")
+                if combined_score > best_rapid_score:
+                    best_rapid_score = combined_score
+                    best_rapid_text = cand_text
+                    best_rapid_variant = f"rapidocr_{var_name}"
+                    best_rapid_boxes = cand_boxes
+
+                # Early-exit optimization: If current variant yields high confidence (>= 0.75) and text (>= 80 chars),
+                # stop immediately to eliminate redundant multi-second CPU cycles on subsequent variants.
+                if best_rapid_score >= 0.75 and len(best_rapid_text.strip()) >= 80:
+                    break
+
+            # If RapidOCR produced solid, readable text, use it as primary ground truth
+            if len(best_rapid_text.strip()) >= 20 and best_rapid_score >= 0.45:
+                languages = cls.detect_languages(best_rapid_text)
+                final_conf = max(0.4, min(0.99, best_rapid_score))
+                return OCRResult(
+                    text=best_rapid_text,
+                    confidence=round(final_conf, 2),
+                    is_uncertain=False,
+                    uncertain_fields=[],
+                    clarity_advisory=None,
+                    languages_detected=languages,
+                    selected_variant=best_rapid_variant,
+                    preprocessing_result=preproc,
+                    structured_demographics={},
+                    engine_used="RapidOCR (ONNX Deep Learning Offline)",
+                    bounding_boxes=best_rapid_boxes
+                )
+
+        # ----------------------------------------------------------------------
+        # Secondary Tier: High-Precision Multilingual AI OCR (Gemini Vision Multi-Model)
+        # Used when offline OCR indicates ambiguity or when deep AI audit is enabled
         # ----------------------------------------------------------------------
         from app.services.gemini_auditor import GeminiAuditorService
         if GeminiAuditorService.is_available():
@@ -338,11 +479,12 @@ class OCREngine:
                     languages_detected=languages,
                     selected_variant="preprocessed+gemini_multimodal_vision",
                     preprocessing_result=preproc,
-                    structured_demographics=structured_fields
+                    structured_demographics=structured_fields,
+                    engine_used="Google Gemini Multimodal AI"
                 )
 
         # ----------------------------------------------------------------------
-        # Secondary / Offline Fallback: Multi-Variant Local OCR (Windows Media OCR)
+        # Tertiary Tier: Local Multi-Variant Windows Media OCR (Windows OS Fallback)
         # ----------------------------------------------------------------------
         best_text = ""
         best_score = -1.0
@@ -389,5 +531,6 @@ class OCREngine:
             languages_detected=languages,
             selected_variant=best_variant_name,
             preprocessing_result=preproc,
-            structured_demographics={}
+            structured_demographics={},
+            engine_used="Windows Media OCR (Offline Native)"
         )
