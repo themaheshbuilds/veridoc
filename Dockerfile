@@ -10,10 +10,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000
 
-# Install minimal OS dependencies for computer vision and PDF rendering
+# Install minimal OS dependencies for computer vision, OpenCV, and PDF rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libgl1 \
     libglib2.0-0 \
+    libgomp1 \
     libsm6 \
     libxext6 \
     libxrender-dev \
