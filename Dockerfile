@@ -30,10 +30,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY backend /app/backend
 COPY frontend /app/frontend
 COPY dataset /app/dataset
-COPY .env /app/.env
 
 # Default port
 EXPOSE 8000
 
-# Run FastAPI backend via production Uvicorn ASGI server
-CMD ["uvicorn", "app.main:app", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Run FastAPI backend via production Uvicorn ASGI server with dynamic port support
+CMD ["sh", "-c", "uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port ${PORT:-8000}"]
