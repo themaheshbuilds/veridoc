@@ -609,9 +609,12 @@ function renderTripleColResults(result, containerId) {
   const forensics = result.forensics || {};
   const fields    = result.extracted_fields || {};
   const ela       = forensics.ela_anomaly_score || 0;
-  const elaHigh   = ela > 0.15;
+  const hasBoxes  = (forensics.suspicious_regions && forensics.suspicious_regions.length > 0);
+  const elaHigh   = ela > 0.03 || forensics.tampering_detected || hasBoxes;
   const elaClass  = elaHigh ? 'suspicious' : 'clean';
-  const elaLabel  = elaHigh ? `⚠️ ELA: ${(ela*100).toFixed(1)}% Anomaly` : `✓ ELA: ${(ela*100).toFixed(1)}% Clean`;
+  const elaLabel  = elaHigh 
+    ? (hasBoxes ? `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)` : `⚠️ ELA: ${(ela*100).toFixed(1)}% Anomaly`) 
+    : `✓ ELA: ${(ela*100).toFixed(1)}% Clean`;
 
   // Column 1: Document Preview
   const previewB64 = result.preview_image_base64 || null;
@@ -2403,4 +2406,134 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function printCertificate() {
+  const certModal = document.getElementById('modal-cert-scrim');
+  const certSheet = certModal ? certModal.querySelector('.cert-paper-sheet') : null;
+  if (!certSheet) {
+    window.print();
+    return;
+  }
+
+  // Clone certificate content to ensure clean isolated print without modal scrim
+  const clone = certSheet.cloneNode(true);
+  clone.querySelectorAll('button').forEach(b => b.remove());
+
+  // Isolated hidden iframe ensures strictly 1-page printing with ZERO duplication
+  const printFrame = document.createElement('iframe');
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  document.body.appendChild(printFrame);
+
+  const frameDoc = printFrame.contentWindow.document;
+  frameDoc.open();
+  frameDoc.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Section 65B Certificate of Electronic Evidence</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 8mm 10mm;
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        html, body {
+          background: #ffffff !important;
+          color: #111111 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+          font-size: 10pt;
+          height: auto;
+          overflow: hidden;
+        }
+        .cert-paper-sheet {
+          max-width: 100% !important;
+          width: 100% !important;
+          border: 2px solid #1c2b21 !important;
+          border-radius: 4px;
+          padding: 8px 12px !important;
+          margin: 0 auto;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          page-break-after: avoid !important;
+        }
+        .cert-guilloche-frame {
+          border: 1.5px solid #233b2a !important;
+          border-radius: 4px;
+          padding: 10px 14px !important;
+          position: relative;
+        }
+        .cert-wax-seal {
+          position: absolute;
+          top: 8px;
+          right: 10px;
+          width: 62px;
+          height: 62px;
+          border: 2px solid #233b2a !important;
+          color: #233b2a !important;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 8px;
+          font-weight: 700;
+          text-align: center;
+          transform: rotate(-10deg);
+        }
+        h2 {
+          font-size: 1.25rem !important;
+          margin: 2px 0 4px 0 !important;
+          color: #111111 !important;
+        }
+        p {
+          font-size: 10px !important;
+          line-height: 1.4 !important;
+          margin: 4px 0 !important;
+          color: #222222 !important;
+        }
+        .cert-guilloche-frame > div:first-of-type {
+          margin-bottom: 0.5rem !important;
+        }
+        div[style*="grid-template-columns"] {
+          padding: 6px 10px !important;
+          gap: 3px 10px !important;
+          font-size: 10px !important;
+          line-height: 1.35 !important;
+          margin: 4px 0 !important;
+          background: #f8faf9 !important;
+          border: 1px solid #d0dad4 !important;
+        }
+        button, div[style*="justify-content: flex-end"] {
+          display: none !important;
+        }
+      </style>
+    </head>
+    <body>
+      ${clone.outerHTML}
+    </body>
+    </html>
+  `);
+  frameDoc.close();
+
+  setTimeout(() => {
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.print();
+    setTimeout(() => {
+      if (document.body.contains(printFrame)) {
+        document.body.removeChild(printFrame);
+      }
+    }, 1500);
+  }, 300);
+}
+
 window.closeCertModal = closeCertModal;
+window.printCertificate = printCertificate;

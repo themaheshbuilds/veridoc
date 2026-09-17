@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 class ForensicAnalyzer:
     """Real optical forensics, Error Level Analysis (ELA), face detection, and QR code extraction."""
 
-    # ELA constants
+    # ELA constants (calibrated for Indian identity credentials)
     ELA_QUALITY = 90
-    ELA_DIFF_THRESHOLD = 60
-    ANOMALY_CLUSTER_MIN_AREA = 250
+    ELA_DIFF_THRESHOLD = 45
+    ANOMALY_CLUSTER_MIN_AREA = 100
 
     @classmethod
     def analyze_image(
@@ -220,19 +220,20 @@ class ForensicAnalyzer:
             # Generate ELA heatmap as colourised base64 PNG for frontend 3-column display
             ela_heatmap_b64: Optional[str] = None
             try:
-                # Create a visually striking heatmap: amplified diff → APPLYCOLORMAP_JET
-                norm_diff = cv2.normalize(amplified, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                # Calibrated physical error mapping: difference 0-4 is cool blue (clean), >12 is hot red (tampered)
+                norm_diff = np.clip(cv2.multiply(gray_diff, 14), 0, 255).astype(np.uint8)
                 heatmap = cv2.applyColorMap(norm_diff, cv2.COLORMAP_JET)
                 # Blend with original for context
-                alpha = 0.65
+                alpha = 0.60
                 blended = cv2.addWeighted(heatmap, alpha, bgr_img, 1.0 - alpha, 0)
-                # Overlay suspicious region boxes in glowing red
+                # Overlay suspicious region boxes in glowing red with high visibility
                 for box in suspicious_boxes:
                     bx = int(box.x / 100.0 * w)
                     by = int(box.y / 100.0 * h)
                     bw2 = int(box.width / 100.0 * w)
                     bh2 = int(box.height / 100.0 * h)
-                    cv2.rectangle(blended, (bx, by), (bx + bw2, by + bh2), (0, 0, 255), 2)
+                    cv2.rectangle(blended, (bx, by), (bx + bw2, by + bh2), (0, 0, 255), 3)
+                    cv2.putText(blended, "ALTERATION", (bx, max(15, by - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                 _, enc_buf = cv2.imencode(".png", blended)
                 ela_heatmap_b64 = "data:image/png;base64," + base64.b64encode(enc_buf).decode("ascii")
             except Exception as e_heat:

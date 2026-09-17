@@ -2480,7 +2480,134 @@ button, a, input, select, textarea {
   }
 }
 
+/* --------------------------------------------------------------------------
+   4. PRINT MEDIA RULES — Section 65B Certificate Single-Page Fit
+   Strictly compacts certificate elements to fit onto exactly 1 single A4 page
+   -------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  /* Reset document background and force strict single page */
+  html, body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: hidden !important;
+    font-size: 10pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Suppress all page elements that are not the certificate modal */
+  header,
+  nav,
+  aside,
+  footer,
+  .terra-header,
+  .brand-bar,
+  .app-header,
+  .terra-nav-rail,
+  .verify-grid,
+  .portal-grid,
+  .history-container,
+  .api-panel-card,
+  .no-print,
+  body > div:not(#modal-cert-scrim) {
+    display: none !important;
+  }
+
+  /* Unfix the modal scrim and display as a standard print block */
+  #modal-cert-scrim,
+  .modal-scrim-bg {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+  }
+
+  /* Compact paper sheet for guaranteed 1-page fit */
+  .cert-paper-sheet {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 2px solid #1c2b21 !important;
+    border-radius: 4px !important;
+    padding: 6mm 8mm !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  .cert-guilloche-frame {
+    border: 1.5px solid #233b2a !important;
+    padding: 6mm 8mm !important;
+    border-radius: 4px !important;
+    position: relative !important;
+  }
+
+  .cert-wax-seal {
+    position: absolute !important;
+    top: 6mm !important;
+    right: 8mm !important;
+    width: 65px !important;
+    height: 65px !important;
+    border: 2px solid #233b2a !important;
+    color: #233b2a !important;
+    font-size: 8.5px !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .cert-guilloche-frame h2 {
+    font-size: 1.25rem !important;
+    margin: 2px 0 4px 0 !important;
+  }
+
+  .cert-guilloche-frame p {
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+    margin: 4px 0 !important;
+  }
+
+  /* Compact the details grid in print */
+  .cert-guilloche-frame div[style*="grid-template-columns"] {
+    padding: 6px 10px !important;
+    gap: 3px 10px !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    margin: 4px 0 !important;
+  }
+
+  /* Hide buttons from the printout */
+  .cert-paper-sheet button,
+  .cert-paper-sheet div[style*="justify-content: flex-end"],
+  .btn-terra-primary,
+  .btn-terra-secondary,
+  .btn-bsa-cert {
+    display: none !important;
+  }
+}
 
 
-
--NoNewline
