@@ -2,6 +2,7 @@ import hashlib
 import json
 import time
 import uuid
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -557,18 +558,97 @@ class VerificationService:
         if quality_report.quality_verdict == "ACCEPTABLE":
             risk_score += 6.0
 
-        # Check for physical document tampering, mathematical failure, or OCR-QR cross-field mismatch
-        has_physical_tamper = (
-            extracted_fields.checksums_valid is False
-            or any(
-                "Mismatch" in f or "Conflict" in f or "Failure" in f or "Tampering" in f or "Anomaly" in f or "Mimicry" in f
-                for f in neg_factors
+        # Cross-reference OCR bounding boxes for typographic stroke disruptions and mechanical scratching
+        if ocr_result and ocr_result.bounding_boxes and cv_img is not None:
+            img_h, img_w = cv_img.shape[:2]
+            for obox in ocr_result.bounding_boxes:
+                otext = obox.get("text", "")
+                opts = obox.get("box", [])
+                if not opts or len(opts) != 4:
+                    continue
+                words = otext.split()
+                is_disrupted = any(
+                    re.search(r'[A-Z]{2,}[a-z]', w) or re.search(r'^[a-z]+[A-Z]', w)
+                    for w in words
+                )
+                if is_disrupted:
+                    xs = [pt[0] for pt in opts]
+                    ys = [pt[1] for pt in opts]
+                    bx, by = min(xs), min(ys)
+                    bw, bh = max(xs) - min(xs), max(ys) - min(ys)
+                    alteration_box = BoundingBox(
+                        x=round((bx / img_w) * 100, 2),
+                        y=round((by / img_h) * 100, 2),
+                        width=round((bw / img_w) * 100, 2),
+                        height=round((bh / img_h) * 100, 2),
+                        label="SUSPICIOUS_ALTERATION",
+                        severity="SUSPICIOUS",
+                        details=f"Typographic & stroke anomaly: Mechanical scratching or character erasure detected in '{otext}'."
+                    )
+                    # Add if not already present
+                    if not any(abs(r.x - alteration_box.x) < 5 and abs(r.y - alteration_box.y) < 5 for r in forensic_report.suspicious_regions):
+                        forensic_report.suspicious_regions.append(alteration_box)
+                    forensic_report.tampering_detected = True
+
+            # Cross-reference OCR bounding boxes for Frankenstein Forgery (mismatched identity fields)
+            if (forensic_report.frankenstein_forgery or any("Frankenstein" in f or "Mismatch" in f for f in neg_factors)):
+                ocr_name = (extracted_fields.name or "").lower().strip()
+                for obox in ocr_result.bounding_boxes:
+                    otext = obox.get("text", "").strip()
+                    opts = obox.get("box", [])
+                    if not opts or len(opts) != 4:
+                        continue
+                    if ocr_name and any(part in otext.lower() for part in ocr_name.split() if len(part) > 2):
+                        xs = [pt[0] for pt in opts]
+                        ys = [pt[1] for pt in opts]
+                        bx, by = min(xs), min(ys)
+                        bw, bh = max(xs) - min(xs), max(ys) - min(ys)
+                        forgery_box = BoundingBox(
+                            x=round((bx / img_w) * 100, 2),
+                            y=round((by / img_h) * 100, 2),
+                            width=round((bw / img_w) * 100, 2),
+                            height=round((bh / img_h) * 100, 2),
+                            label="FORGED_IDENTITY",
+                            severity="SUSPICIOUS",
+                            details=f"Frankenstein Forgery: Visual text '{otext}' contradicts official cryptographic QR payload."
+                        )
+                        if not any(abs(r.x - forgery_box.x) < 5 and abs(r.y - forgery_box.y) < 5 for r in forensic_report.suspicious_regions):
+                            forensic_report.suspicious_regions.append(forgery_box)
+                        forensic_report.tampering_detected = True
+
+        # Ensure all suspicious regions appear on the thermal ELA heatmap
+        if forensic_report.suspicious_regions and forensic_report.ela_heatmap_base64:
+            forensic_report.ela_heatmap_base64 = ForensicAnalyzer.draw_boxes_on_heatmap(
+                forensic_report.ela_heatmap_base64,
+                forensic_report.suspicious_regions
             )
-            or forensic_report.tampering_detected
+
+        # Check for physical document tampering, mathematical failure, or OCR-QR cross-field mismatch
+        statutory_qr_verified = bool(forensic_report.qr_decoded_data and forensic_report.qr_decoded_data.get("status") == "OFFICIAL_VERIFIED")
+        has_critical_factor = any(
+            any(k in f for k in [
+                "Mismatch", "Conflict", "Failure", "Tampering",
+                "Mimicry", "Alteration", "Obliteration", "Erasure", "Scratch",
+                "Discrepancy", "Forgery", "Corrupt"
+            ])
+            for f in neg_factors
+            if not f.startswith("Biometric Portrait")
         )
 
+        if statutory_qr_verified and not has_critical_factor and not forensic_report.frankenstein_forgery and extracted_fields.checksums_valid is not False:
+            has_physical_tamper = False
+        else:
+            has_physical_tamper = (
+                extracted_fields.checksums_valid is False
+                or has_critical_factor
+                or forensic_report.tampering_detected
+                or forensic_report.frankenstein_forgery
+                or (bool(forensic_report.suspicious_regions) and len(forensic_report.suspicious_regions) > 0)
+                or (ai_analysis and ai_analysis.triggered and (ai_analysis.confidence_impact < 0 or any("tamper" in f.lower() or "alter" in f.lower() or "scratch" in f.lower() for f in ai_analysis.findings)))
+            )
+
         # If statutory QR was cryptographically verified, clear risk ONLY IF no physical tampering is detected
-        if forensic_report.qr_decoded_data and forensic_report.qr_decoded_data.get("status") == "OFFICIAL_VERIFIED":
+        if statutory_qr_verified:
             if not has_physical_tamper:
                 risk_score = 0.0
             else:

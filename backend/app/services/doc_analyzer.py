@@ -317,12 +317,16 @@ class DocumentAnalyzer:
             cls._extract_voter_fields(combined_text, fields, positives, negatives)
         elif doc_type == DocumentType.EDUCATION_CERTIFICATE:
             cls._extract_education_fields(combined_text, fields, positives, negatives, raw_original=raw_text)
+        elif dynamic_cat.category == "FINANCIAL_AND_BANKING" or any(w in combined_text for w in ["BANK", "PASSBOOK", "IFSC", "ACCOUNT NO", "A/C"]):
+            cls._extract_banking_fields(combined_text, fields, positives, negatives, raw_original=raw_text)
         else:
             cls._extract_generic_fields(combined_text, fields, positives, negatives, raw_original=raw_text)
 
         # Map dynamic fields to core fields if missing
         if not fields.name and "Student Name" in fields.dynamic_fields:
             fields.name = fields.dynamic_fields["Student Name"]
+        elif not fields.name and "Customer Name" in fields.dynamic_fields:
+            fields.name = fields.dynamic_fields["Customer Name"]
         elif not fields.name and "Name" in fields.dynamic_fields:
             fields.name = fields.dynamic_fields["Name"]
 
@@ -330,12 +334,39 @@ class DocumentAnalyzer:
             fields.document_number = fields.dynamic_fields["Tc No"]
         elif not fields.document_number and "Admission No" in fields.dynamic_fields:
             fields.document_number = fields.dynamic_fields["Admission No"]
+        elif not fields.document_number and "Account No" in fields.dynamic_fields:
+            fields.document_number = fields.dynamic_fields["Account No"]
 
-        # 5. OCR ↔ QR Consistency Comparison
+        # 5. Typographic Integrity & Physical Abrasion / Erasure Check
+        if fields.name:
+            name_str = fields.name.strip()
+            tokens = name_str.split()
+            has_tampered_token = False
+            tamper_tok = ""
+            for tok in tokens:
+                # Glitch 1: Internal mixed uppercase like 'QHit', 'PRasad', 'aBcd'
+                if re.search(r'[A-Z]{2,}[a-z]', tok) or re.search(r'^[a-z]+[A-Z]', tok):
+                    has_tampered_token = True
+                    tamper_tok = tok
+                    break
+                # Glitch 2: Alphanumeric or symbol distortion inside a name token
+                if re.search(r'[^A-Za-z\.\-\']', tok) and not tok.isdigit():
+                    has_tampered_token = True
+                    tamper_tok = tok
+                    break
+            if has_tampered_token:
+                negatives.append(
+                    f"Identity Field Alteration / Ink Obliteration: Name field contains irregular typography "
+                    f"or stroke artifacts ('{tamper_tok}' in '{fields.name}'). Mechanical scratching, erasure, or text alteration detected."
+                )
+                fields.checksums_valid = False
+                fields.checksum_details = f"Mechanical scratching or typography glitch in name: '{tamper_tok}'"
+
+        # 6. OCR ↔ QR Consistency Comparison
         if qr_payload:
             cls._compare_ocr_qr(fields, positives, negatives)
 
-        # 6. Date & Logical Cross-Validation
+        # 7. Date & Logical Cross-Validation
         cls._validate_dates(fields, positives, negatives)
 
         return doc_type, fields, positives, negatives
@@ -359,7 +390,8 @@ class DocumentAnalyzer:
             or "MERA AADHAAR" in text
             or "ENROLMENT NO" in text
             or "HELP@UIDAI" in text
-            or re.search(r'\b[2-9]\d{3}\s\d{4}\s\d{4}\b', text)
+            or "<PRINTLETTERBARCODEDATA" in text
+            or re.search(r'\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b', text)
             or ("GOVERNMENT OF INDIA" in text and any(k in text for k in ["DOB", "MALE", "FEMALE", "YEAR OF BIRTH", "GENDER"]))
         ):
             return DocumentType.AADHAAR
@@ -558,12 +590,14 @@ class DocumentAnalyzer:
                 fields.gender = "TRANSGENDER"
 
         # 3. Check official QR data / Official Registry
+        qr_official_name = None
+        qr_official_dob = None
         if fields.qr_payload:
             off_res = OfficialRegistryService.decode_and_verify_aadhaar_qr(fields.qr_payload)
             if off_res.get("signature_verified"):
                 positives.append(f"UIDAI Official Digital Signature: Validated cryptographic QR envelope ({off_res.get('format')}).")
-                if off_res.get("name"): fields.name = off_res["name"]
-                if off_res.get("dob"): fields.dob = off_res["dob"]
+                qr_official_name = off_res.get("name")
+                qr_official_dob = off_res.get("dob")
                 if off_res.get("gender"): fields.gender = off_res["gender"]
                 if off_res.get("care_of"): fields.care_of = off_res["care_of"]
                 if off_res.get("address"): fields.address = off_res["address"]
@@ -573,8 +607,8 @@ class DocumentAnalyzer:
                 if off_res.get("masked_aadhaar") and not fields.document_number:
                     fields.document_number = off_res["masked_aadhaar"]
         elif qr_data:
-            if "name" in qr_data: fields.name = qr_data["name"]
-            if "dob" in qr_data: fields.dob = qr_data["dob"]
+            qr_official_name = qr_data.get("name")
+            qr_official_dob = qr_data.get("dob")
             if "gender" in qr_data: fields.gender = qr_data["gender"]
             if "uid" in qr_data and not fields.document_number:
                 fields.document_number = qr_data["uid"]
@@ -589,26 +623,45 @@ class DocumentAnalyzer:
             "DISTRICT", "STATE", "ADDRESS", "INFORMATION", "PROOF", "CITIZENSHIP"
         }
 
-        # Strategy A: Line preceding explicit DOB on card face
+        # Strategy A: Explicit 'Name:' label or line preceding DOB on card face
         card_name = None
-        dob_idx = -1
-        for idx, line in enumerate(lines):
-            if re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date)[\s:/]*[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4}', line, re.IGNORECASE):
-                dob_idx = idx
-                break
 
-        if dob_idx > 0:
-            for prev_idx in range(dob_idx - 1, max(-1, dob_idx - 4), -1):
-                cand = lines[prev_idx].strip()
-                cand_clean = re.sub(r'[^A-Za-z\s\.]', '', cand).strip()
-                if len(cand_clean.split()) >= 1 and len(cand_clean) >= 3:
-                    if not any(ign in cand_clean.upper().split() for ign in AADHAAR_IGNORE):
-                        card_name = cand_clean
-                        if prev_idx > 0:
-                            reg_cand = lines[prev_idx - 1].strip()
-                            if any(ord(c) > 127 for c in reg_cand):
-                                fields.name_regional = reg_cand
+        # Check explicit "Name:" header pattern in lines
+        for idx, line in enumerate(lines):
+            clean_l = line.strip()
+            if re.match(r'^(?:Name|Candidate\s*Name|Holder\s*Name)[\s/:\.\w]*$', clean_l, re.IGNORECASE) and idx + 1 < len(lines):
+                next_l = re.sub(r'[^A-Za-z\s\.]', '', lines[idx + 1]).strip()
+                if len(next_l.split()) >= 1 and len(next_l) >= 3:
+                    if not any(ign in next_l.upper().split() for ign in AADHAAR_IGNORE):
+                        card_name = next_l
                         break
+            name_inline_m = re.search(r'^(?:Name|Candidate\s*Name|Holder\s*Name)[\s/:\.\w]*[:\s]+([A-Za-z\s\.]{3,40})$', clean_l, re.IGNORECASE)
+            if name_inline_m:
+                cand = re.sub(r'[^A-Za-z\s\.]', '', name_inline_m.group(1)).strip()
+                if not any(ign in cand.upper().split() for ign in AADHAAR_IGNORE):
+                    card_name = cand
+                    break
+
+        # Fallback: Line preceding explicit DOB on card face
+        if not card_name:
+            dob_idx = -1
+            for idx, line in enumerate(lines):
+                if re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date)', line, re.IGNORECASE):
+                    dob_idx = idx
+                    break
+
+            if dob_idx > 0:
+                for prev_idx in range(dob_idx - 1, max(-1, dob_idx - 4), -1):
+                    cand = lines[prev_idx].strip()
+                    cand_clean = re.sub(r'[^A-Za-z\s\.]', '', cand).strip()
+                    if len(cand_clean.split()) >= 1 and len(cand_clean) >= 3:
+                        if not any(ign in cand_clean.upper().split() for ign in AADHAAR_IGNORE):
+                            card_name = cand_clean
+                            if prev_idx > 0:
+                                reg_cand = lines[prev_idx - 1].strip()
+                                if any(ord(c) > 127 for c in reg_cand):
+                                    fields.name_regional = reg_cand
+                            break
 
         # Strategy B: Aadhaar letter address recipient line (following 'To')
         recipient_name = None
@@ -667,6 +720,31 @@ class DocumentAnalyzer:
         elif recipient_name:
             fields.name = recipient_name
             positives.append(f"Cardholder Identity: Extracted recipient citizen name '{recipient_name}' from letter envelope.")
+        elif qr_official_name:
+            fields.name = qr_official_name
+
+        # Cross-check visual name against QR cryptographic envelope for Frankenstein Forgery
+        if fields.name and qr_official_name:
+            w_vis = set(fields.name.upper().split())
+            w_qr = set(qr_official_name.upper().split())
+            if not (w_vis.intersection(w_qr) or fields.name.upper() in qr_official_name.upper() or qr_official_name.upper() in fields.name.upper()):
+                negatives.append(
+                    f"Critical Frankenstein Forgery / Identity Substitution: Visual card name '{fields.name}' "
+                    f"conflicts with statutory QR cryptographic payload name '{qr_official_name}'. Document is a composite counterfeit."
+                )
+                fields.checksums_valid = False
+                fields.checksum_details = f"Frankenstein forgery: Card '{fields.name}' vs QR '{qr_official_name}'."
+
+        if fields.dob and qr_official_dob:
+            norm_vis_dob = cls._normalize_date(fields.dob)
+            norm_qr_dob = cls._normalize_date(qr_official_dob)
+            if norm_vis_dob and norm_qr_dob and norm_vis_dob != norm_qr_dob:
+                negatives.append(
+                    f"Critical Frankenstein Forgery / DOB Conflict: Visual DOB '{fields.dob}' differs from statutory QR DOB '{qr_official_dob}'."
+                )
+                fields.checksums_valid = False
+        elif not fields.dob and qr_official_dob:
+            fields.dob = qr_official_dob
 
         # Signature Block Check: Detect counterfeit 'Signature Valid' overlay
         if re.search(r'Signatur(?:e|\w*)\s*(?:Valid|yalid|oy)?', text, re.IGNORECASE):
@@ -707,15 +785,39 @@ class DocumentAnalyzer:
                 fields.dob = dob_m.group(1)
 
         # Official PAN QR check
+        pan_qr_name = None
+        pan_qr_dob = None
         if fields.qr_payload:
             pan_qr_res = OfficialRegistryService.decode_and_verify_pan_qr(fields.qr_payload)
             if pan_qr_res.get("signature_verified"):
                 positives.append(f"NSDL / Income Tax Official Registry: PAN {pan_qr_res.get('pan')} verified active in CBDT central ledger.")
-                if pan_qr_res.get("name"): fields.name = pan_qr_res["name"]
-                if pan_qr_res.get("dob"): fields.dob = pan_qr_res["dob"]
+                pan_qr_name = pan_qr_res.get("name")
+                pan_qr_dob = pan_qr_res.get("dob")
 
         if not fields.name or not fields.dob:
             cls._extract_generic_fields(text, fields, positives, negatives)
+
+        if fields.name and pan_qr_name:
+            w_vis = set(fields.name.upper().split())
+            w_qr = set(pan_qr_name.upper().split())
+            if not (w_vis.intersection(w_qr) or fields.name.upper() in pan_qr_name.upper() or pan_qr_name.upper() in fields.name.upper()):
+                negatives.append(
+                    f"Critical Frankenstein Forgery / Identity Substitution: Visual PAN card name '{fields.name}' "
+                    f"conflicts with CBDT statutory QR payload name '{pan_qr_name}'. Document is a composite counterfeit."
+                )
+                fields.checksums_valid = False
+                fields.checksum_details = f"Frankenstein forgery: Visual PAN name '{fields.name}' vs QR '{pan_qr_name}'."
+        elif not fields.name and pan_qr_name:
+            fields.name = pan_qr_name
+
+        if fields.dob and pan_qr_dob:
+            if cls._normalize_date(fields.dob) != cls._normalize_date(pan_qr_dob):
+                negatives.append(
+                    f"Critical Frankenstein Forgery / DOB Conflict: Visual PAN DOB '{fields.dob}' differs from CBDT QR DOB '{pan_qr_dob}'."
+                )
+                fields.checksums_valid = False
+        elif not fields.dob and pan_qr_dob:
+            fields.dob = pan_qr_dob
 
     @classmethod
     def _extract_dl_fields(cls, text: str, fields: ExtractedFields, positives: List[str], negatives: List[str]):
@@ -827,6 +929,43 @@ class DocumentAnalyzer:
             fields.nationality = "NEPALESE"
         elif "BHUTANESE" in text:
             fields.nationality = "BHUTANESE"
+
+    @classmethod
+    def _extract_banking_fields(cls, text: str, fields: ExtractedFields, positives: List[str], negatives: List[str], raw_original: Optional[str] = None):
+        """Extract fields specific to banking passbooks, account statements, and cheques."""
+        # 1. Account Number
+        acc_m = re.search(r'(?:ACCOUNT\s*(?:NO|NUMBER|#)?|A/C\s*(?:NO|NUMBER)?)[\s:：]*([0-9]{9,18})', text, re.IGNORECASE)
+        if acc_m:
+            fields.document_number = acc_m.group(1).strip()
+            positives.append(f"Banking Credential: Extracted Account Number '{fields.document_number}'.")
+            fields.checksums_valid = True
+
+        # 2. IFSC Code
+        ifsc_m = re.search(r'\b([A-Z]{4}0[A-Z0-9]{6})\b', text)
+        if ifsc_m:
+            positives.append(f"Banking Credential: Validated RBI IFSC Code '{ifsc_m.group(1)}'.")
+        else:
+            glitch_ifsc = re.search(r'(?:IFSC|IFSC\s*Code)[\s:：]*([A-Za-z0-9]{8,12})', text, re.IGNORECASE)
+            if glitch_ifsc:
+                val = glitch_ifsc.group(1).strip()
+                if not re.match(r'^[A-Z]{4}0[A-Z0-9]{6}$', val):
+                    negatives.append(f"Banking Integrity Anomaly: IFSC Code '{val}' violates standard RBI format. Potential stroke erasure or digital alteration.")
+                    fields.checksums_valid = False
+
+        # 3. Customer Name
+        name_m = re.search(r'(?:CUSTOMER\s+NAME|ACCOUNT\s+HOLDER\s+NAME|ACCOUNT\s+HOLDER)[\s:：]+([A-Za-z0-9\s]{3,40})', text, re.IGNORECASE)
+        if not name_m:
+            name_m = re.search(r'(?<!BR\.)(?<!BRANCH\s)(?<!FATHER\s)(?<!NOMINEE\s)(?<!MOTHER\s)\bNAME[\s:：]+([A-Za-z0-9\s]{3,40})', text, re.IGNORECASE)
+        if name_m:
+            cand_name = re.split(r'\n|A/C|ACCOUNT|IFSC|BRANCH|NOMINEE|FATHER|ADDRESS', name_m.group(1), flags=re.IGNORECASE)[0].strip()
+            cand_name = re.sub(r'\(.*?\)|IN BLOCK LETTERS|BLOCK LETTERS', '', cand_name, flags=re.IGNORECASE).strip()
+            if len(cand_name) >= 3 and not any(w in cand_name.upper() for w in ["BURUGUPALLY", "BRANCH", "BANK"]):
+                fields.name = cand_name
+                positives.append(f"Banking Credential: Extracted account holder name '{fields.name}'.")
+
+        # Fallback to generic fields if needed
+        if not fields.name:
+            cls._extract_generic_fields(text, fields, positives, negatives, raw_original=raw_original)
 
     @classmethod
     def _extract_generic_fields(cls, text: str, fields: ExtractedFields, positives: List[str], negatives: List[str], raw_original: Optional[str] = None):

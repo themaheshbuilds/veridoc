@@ -609,11 +609,11 @@ function renderTripleColResults(result, containerId) {
   const forensics = result.forensics || {};
   const fields    = result.extracted_fields || {};
   const ela       = forensics.ela_anomaly_score || 0;
-  const hasBoxes  = (forensics.suspicious_regions && forensics.suspicious_regions.length > 0);
-  const elaHigh   = ela > 0.03 || forensics.tampering_detected || hasBoxes;
-  const elaClass  = elaHigh ? 'suspicious' : 'clean';
-  const elaLabel  = elaHigh 
-    ? (hasBoxes ? `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)` : `⚠️ ELA: ${(ela*100).toFixed(1)}% Anomaly`) 
+  const hasBoxes  = (forensics.suspicious_regions && forensics.suspicious_regions.length > 0) || (result.bounding_boxes && result.bounding_boxes.some(b => b.severity === 'SUSPICIOUS' || (b.label && b.label.includes('ALTERATION'))));
+  const isSuspicious = result.overall_verdict === 'SUSPICIOUS' || (result.risk && result.risk.risk_score >= 50) || forensics.tampering_detected || hasBoxes || ela > 0.02;
+  const elaClass  = isSuspicious ? 'suspicious' : 'clean';
+  const elaLabel  = isSuspicious 
+    ? (hasBoxes ? `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)` : `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)`) 
     : `✓ ELA: ${(ela*100).toFixed(1)}% Clean`;
 
   // Column 1: Document Preview
@@ -1032,15 +1032,10 @@ function renderScoreboard(result) {
   confVal.textContent = `${result.risk.confidence_score}%`;
   recVal.textContent = result.officer_recommendation.replace('_', ' ');
 
-  if (result.status_label === 'Low Risk') {
-    ribbon.className = 'verdict-ribbon clear';
-    icon.textContent = 'verified';
-    icon.style.color = 'var(--success)';
-    label.textContent = 'VERDICT: CLEAR / AUTHENTIC';
-    badge.className = 'terra-badge verified';
-    riskVal.style.color = 'var(--success)';
-    recVal.style.color = 'var(--success)';
-  } else if (result.status_label === 'High Risk' || result.status_label === 'Insufficient Quality') {
+  const isSuspicious = result.overall_verdict === 'SUSPICIOUS' || result.status_label === 'High Risk' || (result.risk && result.risk.risk_score >= 50);
+  const isClear = result.overall_verdict === 'CLEAR' && result.status_label === 'Low Risk' && (!result.risk || result.risk.risk_score < 25);
+
+  if (isSuspicious) {
     ribbon.className = 'verdict-ribbon suspicious';
     icon.textContent = 'warning';
     icon.style.color = 'var(--error)';
@@ -1048,11 +1043,19 @@ function renderScoreboard(result) {
     badge.className = 'terra-badge review';
     riskVal.style.color = 'var(--error)';
     recVal.style.color = 'var(--error)';
-  } else if (result.overall_verdict === 'INCONCLUSIVE' || result.status_label === 'Inconclusive') {
+  } else if (isClear) {
+    ribbon.className = 'verdict-ribbon clear';
+    icon.textContent = 'verified';
+    icon.style.color = 'var(--success)';
+    label.textContent = 'VERDICT: CLEAR / AUTHENTIC';
+    badge.className = 'terra-badge verified';
+    riskVal.style.color = 'var(--success)';
+    recVal.style.color = 'var(--success)';
+  } else if (result.overall_verdict === 'INCONCLUSIVE' || result.status_label === 'Inconclusive' || result.status_label === 'Insufficient Quality') {
     ribbon.className = 'verdict-ribbon suspicious';
     icon.textContent = 'help_outline';
     icon.style.color = 'var(--tertiary)';
-    label.textContent = 'VERDICT: UNRECOGNIZED / INCONCLUSIVE';
+    label.textContent = result.status_label === 'Insufficient Quality' ? 'VERDICT: INSUFFICIENT QUALITY' : 'VERDICT: UNRECOGNIZED / INCONCLUSIVE';
     badge.className = 'terra-badge guard';
     riskVal.style.color = 'var(--tertiary)';
     recVal.style.color = 'var(--tertiary)';

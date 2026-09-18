@@ -91,6 +91,33 @@ class ForensicAnalyzer:
         if not qr_detected and not barcode_detected:
             findings.append("Security Matrix: No barcode or QR matrix detected in viewport.")
 
+        # Exclude any suspicious region that overlaps significantly with a decoded 2D QR code or 1D barcode
+        if suspicious_regions and (qr_boxes or barcode_boxes):
+            filtered_regions = []
+            code_boxes = qr_boxes + barcode_boxes
+            for sbox in suspicious_regions:
+                overlaps = False
+                for cbox in code_boxes:
+                    sx1, sy1 = sbox.x, sbox.y
+                    sx2, sy2 = sbox.x + sbox.width, sbox.y + sbox.height
+                    cx1, cy1 = cbox.x, cbox.y
+                    cx2, cy2 = cbox.x + cbox.width, cbox.y + cbox.height
+
+                    ix1, iy1 = max(sx1, cx1), max(sy1, cy1)
+                    ix2, iy2 = min(sx2, cx2), min(sy2, cy2)
+                    if ix2 > ix1 and iy2 > iy1:
+                        inter_area = (ix2 - ix1) * (iy2 - iy1)
+                        sbox_area = max(sbox.width * sbox.height, 1e-4)
+                        if (inter_area / sbox_area) > 0.30:
+                            overlaps = True
+                            break
+                if not overlaps:
+                    filtered_regions.append(sbox)
+            suspicious_regions = filtered_regions
+
+        # Re-evaluate tampering_detected based on filtered suspicious regions
+        tampering_detected = len(suspicious_regions) > 0
+
         # 4. Frankenstein Forgery Detection (QR vs OCR cross-modal triangulation)
         # This flag is set externally by verifier.py after OCR is completed;
         # initialize to False here — verifier will update if mismatch is found.
@@ -163,24 +190,28 @@ class ForensicAnalyzer:
             # Dynamic range contrast stretching for forensic thermal visualization
             max_diff = float(np.max(gray_diff))
             # Scale dynamically so subtle quantization variations and digital edits populate the full spectrum
-            scale_factor = min(255.0 / max(max_diff, 1.0), 30.0) if max_diff > 0 else 15.0
+            scale_factor = 255.0 / max(max_diff, 1.0) if max_diff > 0 else 15.0
             stretched = cv2.convertScaleAbs(gray_diff, alpha=scale_factor)
 
-            # Local Laplacian noise texture to detect digital font splicing and smooth paste patches
+            # High-pass texture: Laplacian edge discrepancy + Difference of Gaussians (DoG)
             gray_orig = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
             laplacian = cv2.Laplacian(gray_orig, cv2.CV_64F)
-            lap_abs = np.clip(np.abs(laplacian) * 1.2, 0, 255).astype(np.uint8)
+            lap_abs = np.clip(np.abs(laplacian) * 1.5, 0, 255).astype(np.uint8)
+            g1 = cv2.GaussianBlur(gray_orig, (3, 3), 0)
+            g2 = cv2.GaussianBlur(gray_orig, (11, 11), 0)
+            dog = np.clip(cv2.absdiff(g1, g2) * 2.0, 0, 255).astype(np.uint8)
 
-            # Multi-spectral forensic fusion: 70% DCT quantization error + 30% local noise disparity
-            fused_error = cv2.addWeighted(stretched, 0.70, lap_abs, 0.30, 0)
+            # Multi-spectral forensic fusion: 50% DCT quantization error + 25% Laplacian + 25% DoG
+            fused_error = cv2.addWeighted(stretched, 0.50, lap_abs, 0.25, 0)
+            fused_error = cv2.addWeighted(fused_error, 1.0, dog, 0.25, 0)
 
             # Measure baseline compression error across non-background features
             mean_val, std_val = cv2.meanStdDev(fused_error)
             baseline_mean = float(mean_val[0][0])
             baseline_std = float(std_val[0][0])
 
-            # Anomaly threshold: regions whose error density significantly departs from document baseline
-            thresh_limit = min(max(int(baseline_mean + 1.4 * baseline_std), 60), 180)
+            # Anomaly threshold: adaptive threshold departing from document baseline
+            thresh_limit = min(max(int(baseline_mean + 1.8 * baseline_std), 25), 180)
             _, thresh = cv2.threshold(fused_error, thresh_limit, 255, cv2.THRESH_BINARY)
 
             # Compact morphological kernel (3x3) to preserve micro-text, digits, and thin boundary cuts
@@ -197,15 +228,26 @@ class ForensicAnalyzer:
             contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             suspicious_boxes: List[BoundingBox] = []
 
+            # Measure contour distribution to detect true statistical outliers departing from document baseline
+            candidate_rois = []
             for cnt in contours:
                 area = cv2.contourArea(cnt)
-                # Catch localized tampering clusters: from small text edits (>50 px) to pasted patches (<35% of page)
-                if 50 < area < (total_pixels * 0.35):
+                # Catch localized tampering clusters: from small text/digit edits (>20 px) to pasted patches (<35% of page)
+                if 20 < area < (total_pixels * 0.35):
                     x, y, bw, bh = cv2.boundingRect(cnt)
                     roi = fused_error[y:y+bh, x:x+bw]
                     roi_mean = float(np.mean(roi))
+                    candidate_rois.append((x, y, bw, bh, area, roi_mean))
 
-                    if roi_mean > (baseline_mean + 1.1 * baseline_std):
+            if candidate_rois:
+                roi_means = [c[5] for c in candidate_rois]
+                mean_roi = float(np.mean(roi_means))
+                std_roi = float(np.std(roi_means))
+                # True anomaly: statistically departs from other textual/ink contours on this document
+                outlier_thresh = max(mean_roi + 2.2 * std_roi, baseline_mean + 2.5 * baseline_std, 40.0)
+
+                for x, y, bw, bh, area, roi_mean in candidate_rois:
+                    if roi_mean > outlier_thresh:
                         suspicious_boxes.append(
                             BoundingBox(
                                 x=round((x / w) * 100, 2),
@@ -214,7 +256,7 @@ class ForensicAnalyzer:
                                 height=round((bh / h) * 100, 2),
                                 label="SUSPICIOUS_ALTERATION",
                                 severity="SUSPICIOUS",
-                                details=f"Quantization & noise divergence: localized error {roi_mean:.1f} diverges from baseline {baseline_mean:.1f}."
+                                details=f"Quantization & noise divergence: localized error {roi_mean:.1f} diverges from document baseline {mean_roi:.1f}."
                             )
                         )
 
@@ -224,8 +266,25 @@ class ForensicAnalyzer:
             # Generate multi-spectral ELA thermal heatmap as colourised base64 PNG
             ela_heatmap_b64: Optional[str] = None
             try:
-                # Apply high-contrast thermal colormap (JET) across fused error
-                heatmap = cv2.applyColorMap(fused_error, cv2.COLORMAP_JET)
+                # Baseline-relative non-linear thermal normalization:
+                # - Below baseline (0..b_mean) -> 0..40 (deep cool blue)
+                # - Baseline to threshold (b_mean..thresh) -> 40..140 (cyan to green)
+                # - Above anomaly threshold (>thresh) -> 140..255 (radiant yellow, orange, and red!)
+                norm_thermal = np.zeros_like(fused_error, dtype=np.float32)
+                below_mask = fused_error <= baseline_mean
+                norm_thermal[below_mask] = (fused_error[below_mask] / max(baseline_mean, 1e-3)) * 40.0
+
+                mid_mask = (fused_error > baseline_mean) & (fused_error <= thresh_limit)
+                span_mid = max(thresh_limit - baseline_mean, 1.0)
+                norm_thermal[mid_mask] = 40.0 + ((fused_error[mid_mask] - baseline_mean) / span_mid) * 100.0
+
+                above_mask = fused_error > thresh_limit
+                span_above = max(255.0 - thresh_limit, 1.0)
+                norm_thermal[above_mask] = 140.0 + ((fused_error[above_mask] - thresh_limit) / span_above) * 115.0
+                thermal_u8 = np.clip(norm_thermal, 0, 255).astype(np.uint8)
+
+                # Apply thermal colormap (JET) across normalized thermal error
+                heatmap = cv2.applyColorMap(thermal_u8, cv2.COLORMAP_JET)
                 # Blend with original document for operational context
                 alpha = 0.55
                 blended = cv2.addWeighted(heatmap, alpha, bgr_img, 1.0 - alpha, 0)
@@ -253,6 +312,42 @@ class ForensicAnalyzer:
         except Exception as ex:
             logger.warning(f"Error executing ELA analysis: {ex}")
             return 0.0, [], None
+
+    @classmethod
+    def draw_boxes_on_heatmap(
+        cls,
+        heatmap_b64: Optional[str],
+        boxes: List[BoundingBox],
+        default_label: str = "ALTERATION"
+    ) -> Optional[str]:
+        """Overlay glowing red bounding boxes on an existing base64 thermal heatmap."""
+        if not heatmap_b64 or not boxes:
+            return heatmap_b64
+        try:
+            raw_b64 = heatmap_b64.split(",", 1)[1] if "," in heatmap_b64 else heatmap_b64
+            img_bytes = base64.b64decode(raw_b64)
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                return heatmap_b64
+            h, w = img.shape[:2]
+            for box in boxes:
+                bx = int(box.x / 100.0 * w)
+                by = int(box.y / 100.0 * h)
+                bw2 = int(box.width / 100.0 * w)
+                bh2 = int(box.height / 100.0 * h)
+                # Outer glowing red boundary
+                cv2.rectangle(img, (bx, by), (bx + bw2, by + bh2), (0, 0, 255), 3)
+                # Alert header tag
+                tag_w = min(130, max(60, bw2 + 10))
+                cv2.rectangle(img, (bx, max(0, by - 18)), (bx + tag_w, by), (0, 0, 255), -1)
+                lbl = box.label.replace("_", " ") if box.label else default_label
+                cv2.putText(img, lbl[:16], (bx + 3, max(12, by - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
+            _, enc_buf = cv2.imencode(".png", img)
+            return "data:image/png;base64," + base64.b64encode(enc_buf).decode("ascii")
+        except Exception as e:
+            logger.warning(f"Error drawing boxes on heatmap: {e}")
+            return heatmap_b64
 
     @classmethod
     def _detect_faces(cls, cv_img: np.ndarray) -> List[BoundingBox]:
