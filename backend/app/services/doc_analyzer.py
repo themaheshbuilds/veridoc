@@ -630,7 +630,10 @@ class DocumentAnalyzer:
             "GOVERNMENT", "INDIA", "AUTHORITY", "IDENTIFICATION", "UNIQUE", 
             "ENROLMENT", "ENROLLMENT", "MALE", "FEMALE", "AADHAAR", "HELP", "TELUGU",
             "BHARAT", "SARKAR", "PRAADHIKARAN", "MERA", "PIN", "CODE", "POST",
-            "DISTRICT", "STATE", "ADDRESS", "INFORMATION", "PROOF", "CITIZENSHIP"
+            "DISTRICT", "STATE", "ADDRESS", "INFORMATION", "PROOF", "CITIZENSHIP",
+            "MOBILE", "PHONE", "TEL", "FATHER", "MOTHER", "HUSBAND", "WIFE", "CARE",
+            "SON", "DAUGHTER", "VALID", "ONLY", "NOT", "YEAR", "YEARS", "DATE",
+            "SIGNATURE", "VERIFIED", "SERVICES", "APPLICATION", "DOCUMENT", "NUMBER"
         }
 
         # Strategy A: Explicit 'Name:' label or line preceding DOB on card face
@@ -654,24 +657,38 @@ class DocumentAnalyzer:
 
         # Fallback: Line preceding explicit DOB on card face
         if not card_name:
-            dob_idx = -1
+            dob_candidates = []
             for idx, line in enumerate(lines):
-                if re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date)', line, re.IGNORECASE):
-                    dob_idx = idx
-                    break
+                # Skip statutory disclaimer lines like "Aadhaar is proof of identity, not of citizenship or date of birth (DOB)"
+                if any(kw in line.lower() for kw in ["proof", "citizenship", "regulation", "disclaimer", "specified in"]):
+                    continue
+                # Match DOB lines with actual dates or canonical DOB labels
+                if re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date)[\s:/]*[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4}', line, re.IGNORECASE) or \
+                   re.search(r'(?:DOB|D0B|Date\s*of\s*Birth|Birth\s*Date|Year\s*of\s*Birth|YOB)[\s:/]*[12][90]\d{2}', line, re.IGNORECASE) or \
+                   re.search(r'\b(?:DOB|D0B)\s*[:/]', line, re.IGNORECASE):
+                    dob_candidates.append(idx)
 
-            if dob_idx > 0:
-                for prev_idx in range(dob_idx - 1, max(-1, dob_idx - 4), -1):
+            # Check from bottom up (card face is usually at the bottom half of the letter)
+            for dob_idx in reversed(dob_candidates):
+                for prev_idx in range(dob_idx - 1, max(-1, dob_idx - 5), -1):
                     cand = lines[prev_idx].strip()
+                    # Skip contact, address, or relationship lines
+                    if re.match(r'^(?:Mobile|Phone|Tel|Email|S/O|D/O|W/O|C/O|Address|H\s*NO|H\.No|Door|Plot|Flat)', cand, re.IGNORECASE):
+                        continue
+                    if re.search(r'\d{5,}', cand):  # skip lines with long numbers (phone, pin, uid)
+                        continue
                     cand_clean = re.sub(r'[^A-Za-z\s\.]', '', cand).strip()
                     if len(cand_clean.split()) >= 1 and len(cand_clean) >= 3:
-                        if not any(ign in cand_clean.upper().split() for ign in AADHAAR_IGNORE):
+                        cand_words = cand_clean.upper().split()
+                        if not any(ign in cand_words for ign in AADHAAR_IGNORE):
                             card_name = cand_clean
                             if prev_idx > 0:
                                 reg_cand = lines[prev_idx - 1].strip()
                                 if any(ord(c) > 127 for c in reg_cand):
                                     fields.name_regional = reg_cand
                             break
+                if card_name:
+                    break
 
         # Strategy B: Aadhaar letter address recipient line (following 'To')
         recipient_name = None
@@ -710,20 +727,28 @@ class DocumentAnalyzer:
             w_card = set(card_name.upper().split())
             w_recip = set(recipient_name.upper().split())
             inter = w_card.intersection(w_recip)
-            union = w_card.union(w_recip)
-            sim = len(inter) / float(len(union)) if union else 0.0
+            has_match = bool(inter) or (card_name.upper() in recipient_name.upper()) or (recipient_name.upper() in card_name.upper())
 
-            if sim < 0.50:
-                negatives.append(
-                    f"Identity Tampering / Intra-Document Conflict: Card face name '{card_name}' differs from letter recipient name '{recipient_name}'. "
-                    f"Physical credential erasure or digital text alteration detected."
-                )
-                fields.checksums_valid = False
-                fields.checksum_details = f"Intra-document identity mismatch: '{card_name}' vs '{recipient_name}'."
-                fields.name = card_name or recipient_name
+            if not has_match:
+                # If one of the names matches the cryptographic QR payload name, use that matching name!
+                if qr_official_name and (w_card.intersection(set(qr_official_name.upper().split())) or w_recip.intersection(set(qr_official_name.upper().split()))):
+                    if w_card.intersection(set(qr_official_name.upper().split())):
+                        fields.name = card_name
+                    else:
+                        fields.name = recipient_name
+                    positives.append(f"Cardholder Identity: Citizen name '{fields.name}' confirmed against official cryptographic signature.")
+                else:
+                    negatives.append(
+                        f"Identity Tampering / Intra-Document Conflict: Card face name '{card_name}' differs from letter recipient name '{recipient_name}'. "
+                        f"Physical credential erasure or digital text alteration detected."
+                    )
+                    fields.checksums_valid = False
+                    fields.checksum_details = f"Intra-document identity mismatch: '{card_name}' vs '{recipient_name}'."
+                    fields.name = card_name or recipient_name
             else:
-                positives.append(f"Cardholder Identity: Extracted citizen name '{card_name}' verified consistent across credential face.")
-                fields.name = recipient_name if len(recipient_name) > len(card_name) else card_name
+                chosen = recipient_name if len(recipient_name) > len(card_name) else card_name
+                positives.append(f"Cardholder Identity: Extracted citizen name '{chosen}' verified consistent across credential face.")
+                fields.name = chosen
         elif card_name:
             fields.name = card_name
             positives.append(f"Cardholder Identity: Extracted citizen name '{card_name}' from visual credential.")
@@ -737,13 +762,17 @@ class DocumentAnalyzer:
         if fields.name and qr_official_name:
             w_vis = set(fields.name.upper().split())
             w_qr = set(qr_official_name.upper().split())
-            if not (w_vis.intersection(w_qr) or fields.name.upper() in qr_official_name.upper() or qr_official_name.upper() in fields.name.upper()):
+            is_name_match = bool(w_vis.intersection(w_qr)) or (fields.name.upper() in qr_official_name.upper()) or (qr_official_name.upper() in fields.name.upper())
+            if not is_name_match:
                 negatives.append(
                     f"Critical Frankenstein Forgery / Identity Substitution: Visual card name '{fields.name}' "
                     f"conflicts with statutory QR cryptographic payload name '{qr_official_name}'. Document is a composite counterfeit."
                 )
                 fields.checksums_valid = False
                 fields.checksum_details = f"Frankenstein forgery: Card '{fields.name}' vs QR '{qr_official_name}'."
+            else:
+                positives.append(f"Statutory Cross-Match: Visual card name '{fields.name}' verified against UIDAI cryptographic signature.")
+                fields.name = qr_official_name  # Canonical official name
 
         if fields.dob and qr_official_dob:
             norm_vis_dob = cls._normalize_date(fields.dob)

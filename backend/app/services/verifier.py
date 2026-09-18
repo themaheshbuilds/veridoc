@@ -636,19 +636,37 @@ class VerificationService:
         if quality_report.quality_verdict == "ACCEPTABLE":
             risk_score += 6.0
 
+        statutory_qr_verified = bool(forensic_report.qr_decoded_data and forensic_report.qr_decoded_data.get("status") == "OFFICIAL_VERIFIED")
+
         # Cross-reference OCR bounding boxes for typographic stroke disruptions and mechanical scratching
-        if ocr_result and ocr_result.bounding_boxes and cv_img is not None:
+        # Exclude legitimate branding (mAadhaar, eAadhaar), concatenated OCR prepositions (ofIndia, byAadhaar),
+        # and disclaimers/instructions.
+        KNOWN_VALID_WORDS = {
+            "maadhaar", "eaadhaar", "uidai", "mparivahan", "digilocker", "ekyc",
+            "aadhaarnumberholder", "ofindia", "byaadhaar", "foraadhaar", "toaadhaar",
+            "inaadhaar", "andservices", "govt", "gov", "nic", "qr", "xml", "ist"
+        }
+        if ocr_result and ocr_result.bounding_boxes and cv_img is not None and not statutory_qr_verified:
             img_h, img_w = cv_img.shape[:2]
             for obox in ocr_result.bounding_boxes:
-                otext = obox.get("text", "")
+                otext = obox.get("text", "").strip()
                 opts = obox.get("box", [])
                 if not opts or len(opts) != 4:
                     continue
+                # Skip instructional sentences or disclaimers
+                if any(kw in otext.lower() for kw in ["download", "app", "service", "regulations", "consent", "seeking", "enrolment", "update", "unique", "identification", "authority"]):
+                    continue
                 words = otext.split()
-                is_disrupted = any(
-                    re.search(r'[A-Z]{2,}[a-z]', w) or re.search(r'^[a-z]+[A-Z]', w)
-                    for w in words
-                )
+                is_disrupted = False
+                for w in words:
+                    clean_w = re.sub(r'[^A-Za-z]', '', w).lower()
+                    if clean_w in KNOWN_VALID_WORDS or len(clean_w) < 4:
+                        continue
+                    # True mechanical scratch disruption: uppercase block with embedded lowercase or fragmented symbols like 'QHit'
+                    if re.search(r'\b[A-Z]{2,}[a-z]{1,2}[A-Z]{1,2}\b', w):
+                        is_disrupted = True
+                        break
+
                 if is_disrupted:
                     xs = [pt[0] for pt in opts]
                     ys = [pt[1] for pt in opts]
@@ -694,15 +712,7 @@ class VerificationService:
                             forensic_report.suspicious_regions.append(forgery_box)
                         forensic_report.tampering_detected = True
 
-        # Ensure all suspicious regions appear on the thermal ELA heatmap
-        if forensic_report.suspicious_regions and forensic_report.ela_heatmap_base64:
-            forensic_report.ela_heatmap_base64 = ForensicAnalyzer.draw_boxes_on_heatmap(
-                forensic_report.ela_heatmap_base64,
-                forensic_report.suspicious_regions
-            )
-
         # Check for physical document tampering, mathematical failure, or OCR-QR cross-field mismatch
-        statutory_qr_verified = bool(forensic_report.qr_decoded_data and forensic_report.qr_decoded_data.get("status") == "OFFICIAL_VERIFIED")
         has_critical_factor = any(
             any(k in f for k in [
                 "Mismatch", "Conflict", "Failure", "Tampering",
@@ -715,6 +725,8 @@ class VerificationService:
 
         if statutory_qr_verified and not has_critical_factor and not forensic_report.frankenstein_forgery and extracted_fields.checksums_valid is not False:
             has_physical_tamper = False
+            forensic_report.tampering_detected = False
+            forensic_report.suspicious_regions = []
         else:
             has_physical_tamper = (
                 extracted_fields.checksums_valid is False
@@ -723,6 +735,13 @@ class VerificationService:
                 or forensic_report.frankenstein_forgery
                 or (bool(forensic_report.suspicious_regions) and len(forensic_report.suspicious_regions) > 0)
                 or (ai_analysis and ai_analysis.triggered and (ai_analysis.confidence_impact < 0 or any("tamper" in f.lower() or "alter" in f.lower() or "scratch" in f.lower() for f in ai_analysis.findings)))
+            )
+
+        # Ensure all suspicious regions appear on the thermal ELA heatmap
+        if forensic_report.suspicious_regions and forensic_report.ela_heatmap_base64:
+            forensic_report.ela_heatmap_base64 = ForensicAnalyzer.draw_boxes_on_heatmap(
+                forensic_report.ela_heatmap_base64,
+                forensic_report.suspicious_regions
             )
 
         # If statutory QR was cryptographically verified, clear risk ONLY IF no physical tampering is detected

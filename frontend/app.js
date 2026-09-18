@@ -620,11 +620,11 @@ function renderTripleColResults(result, containerId) {
   const fields    = result.extracted_fields || {};
   const ela       = forensics.ela_anomaly_score || 0;
   const hasBoxes  = (forensics.suspicious_regions && forensics.suspicious_regions.length > 0) || (result.bounding_boxes && result.bounding_boxes.some(b => b.severity === 'SUSPICIOUS' || (b.label && b.label.includes('ALTERATION'))));
-  const isSuspicious = result.overall_verdict === 'SUSPICIOUS' || (result.risk && result.risk.risk_score >= 50) || forensics.tampering_detected || hasBoxes || ela > 0.02;
+  const isSuspicious = result.overall_verdict === 'SUSPICIOUS' || (result.risk && result.risk.risk_score >= 50) || (forensics.tampering_detected && hasBoxes);
   const elaClass  = isSuspicious ? 'suspicious' : 'clean';
   const elaLabel  = isSuspicious 
-    ? (hasBoxes ? `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)` : `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)`) 
-    : `✓ ELA: ${(ela*100).toFixed(1)}% Clean`;
+    ? `⚠️ ELA: Alteration Detected (${(ela*100).toFixed(1)}%)` 
+    : `✓ ELA: Clean (${(ela*100).toFixed(1)}%)`;
 
   // Column 1: Document Preview
   const previewB64 = result.preview_image_base64 || null;

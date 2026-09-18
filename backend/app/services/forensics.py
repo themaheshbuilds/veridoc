@@ -69,7 +69,7 @@ class ForensicAnalyzer:
                 from app.services.official_registry import OfficialRegistryService
                 for p_text in qr_payloads:
                     clean_p = p_text.strip()
-                    if "<PrintLetterBarcodeData" in clean_p or (clean_p.isdigit() and len(clean_p) > 250):
+                    if "<PrintLetterBarcodeData" in clean_p or (clean_p.isdigit() and len(clean_p) > 180):
                         dec = OfficialRegistryService.decode_and_verify_aadhaar_qr(clean_p)
                         if dec.get("status") == "OFFICIAL_VERIFIED":
                             qr_decoded_data = dec
@@ -244,10 +244,10 @@ class ForensicAnalyzer:
                 mean_roi = float(np.mean(roi_means))
                 std_roi = float(np.std(roi_means))
                 # True anomaly: statistically departs from other textual/ink contours on this document
-                outlier_thresh = max(mean_roi + 2.2 * std_roi, baseline_mean + 2.5 * baseline_std, 40.0)
+                outlier_thresh = max(mean_roi + 2.8 * std_roi, baseline_mean + 3.0 * baseline_std, 75.0)
 
                 for x, y, bw, bh, area, roi_mean in candidate_rois:
-                    if roi_mean > outlier_thresh:
+                    if roi_mean > outlier_thresh and (roi_mean - mean_roi) >= 28.0:
                         suspicious_boxes.append(
                             BoundingBox(
                                 x=round((x / w) * 100, 2),
