@@ -405,6 +405,8 @@ function initVerifyView() {
   if (btnClearStaged) {
     btnClearStaged.addEventListener('click', () => {
       appState.stagedFiles = [];
+      const pwdInput = document.getElementById('pdf-password-input');
+      if (pwdInput) pwdInput.value = '';
       renderStagedFiles();
       if (fileInput) fileInput.value = '';
       resetTimer();
@@ -439,11 +441,19 @@ function renderStagedFiles() {
 
   if (appState.stagedFiles.length === 0) {
     container.style.display = 'none';
+    const pwdContainer = document.getElementById('pdf-password-container');
+    if (pwdContainer) pwdContainer.style.display = 'none';
     return;
   }
 
   container.style.display = 'block';
   list.innerHTML = '';
+
+  const hasPdf = appState.stagedFiles.some(f => (f.name || '').toLowerCase().endsWith('.pdf'));
+  const pwdContainer = document.getElementById('pdf-password-container');
+  if (pwdContainer) {
+    pwdContainer.style.display = hasPdf ? 'block' : 'none';
+  }
 
   appState.stagedFiles.forEach((file, idx) => {
     const chip = document.createElement('div');
@@ -718,6 +728,7 @@ async function executeVerification() {
   const procContainer = document.getElementById('processing-state-container');
   const resContainer = document.getElementById('results-state-container');
   const forceDeepAi = document.getElementById('check-force-ai')?.checked || false;
+  const pdfPassword = (document.getElementById('pdf-password-input')?.value || '').trim();
 
   if (emptyContainer) emptyContainer.style.display = 'none';
   if (resContainer) resContainer.style.display = 'none';
@@ -733,6 +744,10 @@ async function executeVerification() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('force_deep_ai', forceDeepAi);
+      if (pdfPassword) {
+        formData.append('pdf_password', pdfPassword);
+        formData.append('password', pdfPassword);
+      }
 
       const resp = await fetch('/api/v1/verify', {
         method: 'POST',
@@ -766,6 +781,10 @@ async function executeVerification() {
         formData.append('files', f);
       });
       formData.append('force_deep_ai', forceDeepAi);
+      if (pdfPassword) {
+        formData.append('pdf_password', pdfPassword);
+        formData.append('password', pdfPassword);
+      }
 
       const resp = await fetch('/api/v1/verify-multiple', {
         method: 'POST',
@@ -853,7 +872,34 @@ function renderResults(result) {
   const qDesc = document.getElementById('quality-alert-desc');
   const qDefects = document.getElementById('quality-defects-list');
 
-  if (result.quality.quality_verdict === 'POOR') {
+  if (result.status_label === 'Password Required') {
+    qBox.style.display = 'block';
+    qBox.style.borderColor = '#f59e0b';
+    qBox.style.background = 'rgba(245, 158, 11, 0.08)';
+    qBox.style.borderLeftColor = '#f59e0b';
+    qTitle.textContent = '🔒 Password Required to Open Document';
+    qDesc.textContent = result.explanation?.primary_rationale || 'This PDF document is encrypted and requires a password to unlock. For e-Aadhaar PDFs, enter the first 4 letters of citizen NAME in CAPITAL + 4-digit Year of Birth (e.g. VILA2007).';
+    qDefects.innerHTML = `
+      <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <input type="text" id="result-inline-pwd" placeholder="e.g. VILA2007" style="padding: 0.4rem 0.6rem; font-size: 13px; font-weight: 600; border: 1px solid var(--border-default); border-radius: 4px; background: var(--surface-card); color: var(--text-primary); text-transform: uppercase;">
+        <button class="btn-terra-primary" id="btn-retry-with-pwd" style="padding: 0.4rem 1rem; font-size: 12px; cursor: pointer;">Unlock &amp; Re-verify</button>
+      </div>
+    `;
+    setTimeout(() => {
+      const btn = document.getElementById('btn-retry-with-pwd');
+      const inp = document.getElementById('result-inline-pwd');
+      if (btn && inp) {
+        btn.addEventListener('click', () => {
+          const val = inp.value.trim();
+          if (val) {
+            const mainInp = document.getElementById('pdf-password-input');
+            if (mainInp) mainInp.value = val;
+            executeVerification();
+          }
+        });
+      }
+    }, 50);
+  } else if (result.quality.quality_verdict === 'POOR') {
     qBox.style.display = 'block';
     qTitle.textContent = 'Low Document Quality Detected';
     qDesc.textContent = result.quality.remediation_advice || 'Low document quality. Reliable verification is not possible. Please upload a clearer document.';

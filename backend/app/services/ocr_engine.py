@@ -359,7 +359,8 @@ class OCREngine:
     async def extract_text_from_document(
         cls,
         file_bytes: bytes,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        password: Optional[str] = None
     ) -> OCRResult:
         """
         Main OCR execution method conforming to strict user directives:
@@ -378,28 +379,41 @@ class OCREngine:
         # 1. Digital PDF extraction check
         if is_pdf and HAS_FITZ:
             try:
-                doc = fitz.open(stream=file_bytes, filetype="pdf")
-                pdf_text = ""
-                for page in doc:
-                    t = page.get_text()
-                    if t and len(t.strip()) > 30:
-                        pdf_text += t + "\n"
-                if len(pdf_text.strip()) > 40:
-                    langs = cls.detect_languages(pdf_text)
-                    return OCRResult(
-                        text=pdf_text.strip(),
-                        confidence=0.98,
-                        is_uncertain=False,
-                        languages_detected=langs,
-                        selected_variant="pdf_digital_layer"
-                    )
+                from app.services.quality_assessor import DocumentQualityAssessor
+                doc, _ = DocumentQualityAssessor.open_pdf_doc(file_bytes, filename=filename, password=password)
+                if doc and len(doc) > 0:
+                    pdf_text = ""
+                    for page in doc:
+                        t = page.get_text()
+                        if t and len(t.strip()) > 15:
+                            pdf_text += t + "\n"
+                    if len(pdf_text.strip()) > 25:
+                        langs = cls.detect_languages(pdf_text)
+                        # Also render page to get optical bounding boxes for UI overlay
+                        page = doc[0]
+                        mat = fitz.Matrix(2.5, 2.5)
+                        pix = page.get_pixmap(matrix=mat)
+                        img_bytes = pix.tobytes("png")
+                        cand_text, cand_conf, cand_boxes = cls.recognize_with_rapid_ocr(img_bytes)
+                        final_text = pdf_text.strip()
+                        if cand_text and len(cand_text.strip()) > len(final_text):
+                            final_text = f"{final_text}\n{cand_text.strip()}"
+                        return OCRResult(
+                            text=final_text,
+                            confidence=0.98,
+                            bounding_boxes=cand_boxes or [],
+                            is_uncertain=False,
+                            languages_detected=langs,
+                            selected_variant="pdf_digital_layer",
+                            engine_used="PyMuPDF Vector Stream + RapidOCR"
+                        )
             except Exception as e:
                 logger.debug(f"PDF digital text extraction: {e}")
 
         # ----------------------------------------------------------------------
         # Mandatory Step: Preprocessing Pipeline (Raw bytes untouched for forensics)
         # ----------------------------------------------------------------------
-        preproc = DocumentPreprocessor.preprocess_document_image(file_bytes, filename)
+        preproc = DocumentPreprocessor.preprocess_document_image(file_bytes, filename, password=password)
 
         # ----------------------------------------------------------------------
         # Primary Tier: RapidOCR (100% Offline Deep Learning via ONNX Runtime)

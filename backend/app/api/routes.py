@@ -274,6 +274,8 @@ async def verify_document(
     force_deep_ai: bool = Form(False),
     prototype_mode: bool = Form(True),
     skip_live_gateway: bool = Form(True),
+    pdf_password: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
     file: UploadFile = File(..., description="Actual identity/travel document scan or PDF"),
     api_key: str = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db)
@@ -296,11 +298,13 @@ async def verify_document(
     if len(file_bytes) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File exceeds maximum allowed size (25MB).")
 
+    eff_password = pdf_password or password
     req = VerificationRequest(
         declared_document_type=declared_document_type,
         checkpoint_id=checkpoint_id,
         officer_id=officer_id,
-        force_deep_ai=force_deep_ai
+        force_deep_ai=force_deep_ai,
+        pdf_password=eff_password
     )
 
     try:
@@ -308,7 +312,8 @@ async def verify_document(
             payload=req,
             db=db,
             file_bytes=file_bytes,
-            filename=filename
+            filename=filename,
+            pdf_password=eff_password
         )
     except HTTPException:
         raise
@@ -324,6 +329,8 @@ async def verify_multiple_documents(
     checkpoint_id: str = Form("SSB-CHK-01"),
     officer_id: str = Form("SSB-OFFICER-01"),
     force_deep_ai: bool = Form(False),
+    pdf_password: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
     files: List[UploadFile] = File(..., description="Two or more documents to verify and cross-compare"),
     api_key: str = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db)
@@ -346,11 +353,13 @@ async def verify_multiple_documents(
             raise HTTPException(status_code=400, detail=f"File '{filename}' is empty.")
         file_payloads.append((content, filename))
 
+    eff_password = pdf_password or password
     req = VerificationRequest(
         declared_document_type=declared_document_type,
         checkpoint_id=checkpoint_id,
         officer_id=officer_id,
-        force_deep_ai=force_deep_ai
+        force_deep_ai=force_deep_ai,
+        pdf_password=eff_password
     )
 
     try:

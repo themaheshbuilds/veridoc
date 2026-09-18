@@ -49,14 +49,24 @@ class DocumentAnalyzer:
     VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
 
     @classmethod
-    async def extract_ocr_result(cls, file_bytes: bytes, filename: Optional[str] = None) -> OCRResult:
+    async def extract_ocr_result(
+        cls,
+        file_bytes: bytes,
+        filename: Optional[str] = None,
+        password: Optional[str] = None
+    ) -> OCRResult:
         """Run full preprocessed multi-variant and multilingual OCR."""
-        return await OCREngine.extract_text_from_document(file_bytes, filename)
+        return await OCREngine.extract_text_from_document(file_bytes, filename, password=password)
 
     @classmethod
-    async def extract_text_from_file(cls, file_bytes: bytes, filename: Optional[str] = None) -> str:
+    async def extract_text_from_file(
+        cls,
+        file_bytes: bytes,
+        filename: Optional[str] = None,
+        password: Optional[str] = None
+    ) -> str:
         """Backwards-compatible helper returning raw extracted text."""
-        res = await cls.extract_ocr_result(file_bytes, filename)
+        res = await cls.extract_ocr_result(file_bytes, filename, password=password)
         return res.text
 
     @classmethod

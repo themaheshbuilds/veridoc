@@ -433,15 +433,37 @@ class OfficialRegistryService:
         return result
 
     @classmethod
-    def scan_qr_from_image(cls, image_bytes: bytes) -> Optional[str]:
+    def scan_qr_from_image(cls, image_bytes: Any, password: Optional[str] = None) -> Optional[str]:
         """
-        Extract QR code string from an image byte buffer using zxing-cpp
-        with multi-scale contrast-enhanced scanning, quiet zone padding, and OpenCV fallback.
+        Extract QR code string from an image byte buffer, PDF file, or OpenCV numpy array
+        using zxing-cpp with multi-scale contrast-enhanced scanning, quiet zone padding, and OpenCV fallback.
         Supports standard UTF-8 string barcodes as well as raw binary / BigInteger Aadhaar payloads.
         """
         try:
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if isinstance(image_bytes, np.ndarray):
+                img = image_bytes
+            elif isinstance(image_bytes, bytes):
+                if image_bytes[:4] == b"%PDF":
+                    try:
+                        from app.services.quality_assessor import DocumentQualityAssessor
+                        import fitz
+                        from PIL import Image
+                        doc, _ = DocumentQualityAssessor.open_pdf_doc(image_bytes, password=password)
+                        if doc and len(doc) > 0:
+                            page = doc[0]
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5))
+                            pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+                        else:
+                            return None
+                    except Exception:
+                        return None
+                else:
+                    nparr = np.frombuffer(image_bytes, np.uint8)
+                    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            else:
+                return None
+
             if img is None:
                 return None
 

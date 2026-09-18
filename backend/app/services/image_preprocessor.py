@@ -62,7 +62,8 @@ class DocumentPreprocessor:
     def preprocess_document_image(
         cls,
         raw_bytes: bytes,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        password: Optional[str] = None
     ) -> PreprocessingResult:
         """
         Main entry point for pre-OCR processing.
@@ -79,10 +80,12 @@ class DocumentPreprocessor:
         cv_img = None
         if is_pdf and HAS_FITZ:
             try:
-                doc = fitz.open(stream=raw_bytes, filetype="pdf")
-                if len(doc) > 0:
+                from app.services.quality_assessor import DocumentQualityAssessor
+                doc, _ = DocumentQualityAssessor.open_pdf_doc(raw_bytes, filename=filename, password=password)
+                if doc and len(doc) > 0:
                     page = doc[0]
-                    pix = page.get_pixmap(dpi=200)
+                    mat = fitz.Matrix(2.5, 2.5)
+                    pix = page.get_pixmap(matrix=mat)
                     img_bytes = pix.tobytes("png")
                     nparr = np.frombuffer(img_bytes, np.uint8)
                     cv_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)

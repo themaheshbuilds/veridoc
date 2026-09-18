@@ -167,6 +167,10 @@ class VerificationRequest(BaseModel):
         default=False,
         description="Explicitly force Tier-2 deep AI analysis even if fast checks pass"
     )
+    pdf_password: Optional[str] = Field(
+        default=None,
+        description="Optional password to decrypt protected PDFs (e.g. e-Aadhaar)"
+    )
 
 
 class ExplanationResult(BaseModel):

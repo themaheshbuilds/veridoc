@@ -43,7 +43,8 @@ class VerificationService:
         payload: VerificationRequest,
         db: Optional[AsyncSession] = None,
         file_bytes: Optional[bytes] = None,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        pdf_password: Optional[str] = None
     ) -> VerificationResponse:
         start_time = time.time()
         session_id = f"veridoc-sess-{uuid.uuid4().hex[:8]}"
@@ -52,12 +53,88 @@ class VerificationService:
         if not file_bytes:
             raise ValueError("No document file was uploaded. Every verification result must come from an actual document.")
 
+        eff_password = pdf_password or (getattr(payload, "pdf_password", None) if payload else None)
+
         # ----------------------------------------------------------------------
         # Stage 1: Document Quality Assessment Gate
         # ----------------------------------------------------------------------
         t_qual_start = time.time()
-        cv_img, load_err = DocumentQualityAssessor.load_image_cv2(file_bytes, filename)
+        cv_img, load_err = DocumentQualityAssessor.load_image_cv2(file_bytes, filename, password=eff_password)
         if cv_img is None:
+            is_pwd_req = bool(load_err and "PDF_PASSWORD_REQUIRED" in load_err)
+            if is_pwd_req:
+                total_duration_ms = round((time.time() - start_time) * 1000, 1)
+                audit_hash = cls.calculate_sha256(f"{session_id}:PASSWORD_REQUIRED:{timestamp.isoformat()}")
+
+                quality_report = DocumentQualityReport(
+                    quality_verdict="ACCEPTABLE",
+                    blur_score=100.0,
+                    brightness_score=100.0,
+                    contrast_score=100.0,
+                    resolution=(0, 0),
+                    is_blurry=False,
+                    issues=["PDF document is encrypted / password-protected."]
+                )
+
+                risk_report = RiskReport(
+                    risk_level=RiskLevel.MEDIUM,
+                    risk_score=50.0,
+                    confidence_score=50.0,
+                    overall_verdict=OverallVerdict.INCONCLUSIVE
+                )
+
+                explanation = ExplanationResult(
+                    primary_rationale="This PDF document is encrypted and requires a password to unlock. For e-Aadhaar PDFs, the standard statutory password format is the first 4 letters of the citizen's NAME in CAPITAL letters followed by the 4-digit Year of Birth (e.g., VILA2007).",
+                    positive_factors=["Valid encrypted PDF document container received."],
+                    negative_factors=["Decryption password required."],
+                    inconclusive_factors=["Automated forensic analysis halted pending user authentication password."]
+                )
+
+                telemetry = VerificationTelemetry(
+                    quality_check_ms=round((time.time() - t_qual_start) * 1000, 1),
+                    total_duration_ms=total_duration_ms
+                )
+
+                if db is not None:
+                    await cls._save_session_record(
+                        db=db,
+                        session_id=session_id,
+                        timestamp=timestamp,
+                        doc_type="UNKNOWN",
+                        payload=payload,
+                        overall_verdict=OverallVerdict.INCONCLUSIVE.value,
+                        recommendation=OfficerAction.SECONDARY_INSPECTION.value,
+                        risk_level=RiskLevel.MEDIUM.value,
+                        risk_score=50.0,
+                        confidence_score=50.0,
+                        audit_hash=audit_hash,
+                        extracted_data={"status": "PASSWORD_REQUIRED"},
+                        explanation=explanation.model_dump(mode='json'),
+                        telemetry=telemetry.model_dump(mode='json'),
+                        evidence_items=[]
+                    )
+
+                return VerificationResponse(
+                    session_id=session_id,
+                    timestamp=timestamp,
+                    filename=filename,
+                    document_type=DocumentType.UNKNOWN,
+                    overall_verdict=OverallVerdict.INCONCLUSIVE,
+                    officer_recommendation=OfficerAction.SECONDARY_INSPECTION,
+                    status_label="Password Required",
+                    risk=risk_report,
+                    quality=quality_report,
+                    forensics=ForensicAnalyzer.analyze_image(None),
+                    extracted_fields=DocumentAnalyzer.analyze_document("", None)[1],
+                    ai_analysis=AIAnalysisReport(triggered=False),
+                    explanation=explanation,
+                    evidence=[],
+                    bounding_boxes=[],
+                    telemetry=telemetry,
+                    audit_hash=audit_hash,
+                    preview_image_base64=None
+                )
+
             quality_report = DocumentQualityAssessor.assess_quality(None)
         else:
             quality_report = DocumentQualityAssessor.assess_quality(cv_img)
@@ -70,12 +147,12 @@ class VerificationService:
                 import cv2
                 import base64
                 h, w = cv_img.shape[:2]
-                if max(h, w) > 1600:
-                    scale = 1600.0 / max(h, w)
+                if max(h, w) > 2000:
+                    scale = 2000.0 / max(h, w)
                     disp_img = cv2.resize(cv_img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
                 else:
                     disp_img = cv_img
-                success, enc = cv2.imencode(".jpg", disp_img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+                success, enc = cv2.imencode(".jpg", disp_img, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
                 if success:
                     b64_str = base64.b64encode(enc).decode("ascii")
                     preview_image_base64 = f"data:image/jpeg;base64,{b64_str}"
@@ -123,23 +200,24 @@ class VerificationService:
             )
 
             # Persist session to DB
-            await cls._save_session_record(
-                db=db,
-                session_id=session_id,
-                timestamp=timestamp,
-                doc_type="UNKNOWN",
-                payload=payload,
-                overall_verdict=OverallVerdict.INCONCLUSIVE.value,
-                recommendation=OfficerAction.SECONDARY_INSPECTION.value,
-                risk_level=RiskLevel.HIGH.value,
-                risk_score=85.0,
-                confidence_score=95.0,
-                audit_hash=audit_hash,
-                extracted_data={"quality_verdict": "POOR"},
-                explanation=explanation.model_dump(mode='json'),
-                telemetry=telemetry.model_dump(mode='json'),
-                evidence_items=evidence_items
-            )
+            if db is not None:
+                await cls._save_session_record(
+                    db=db,
+                    session_id=session_id,
+                    timestamp=timestamp,
+                    doc_type="UNKNOWN",
+                    payload=payload,
+                    overall_verdict=OverallVerdict.INCONCLUSIVE.value,
+                    recommendation=OfficerAction.SECONDARY_INSPECTION.value,
+                    risk_level=RiskLevel.HIGH.value,
+                    risk_score=85.0,
+                    confidence_score=95.0,
+                    audit_hash=audit_hash,
+                    extracted_data={"quality_verdict": "POOR"},
+                    explanation=explanation.model_dump(mode='json'),
+                    telemetry=telemetry.model_dump(mode='json'),
+                    evidence_items=evidence_items
+                )
 
             return VerificationResponse(
                 session_id=session_id,
@@ -179,7 +257,7 @@ class VerificationService:
         # Stage 3: Extraction & Structural Analysis (Preprocessing + Multi-Variant OCR + Dynamic Fields)
         # ----------------------------------------------------------------------
         t_ext_start = time.time()
-        ocr_result = await DocumentAnalyzer.extract_ocr_result(file_bytes, filename)
+        ocr_result = await DocumentAnalyzer.extract_ocr_result(file_bytes, filename, password=eff_password)
         raw_text = ocr_result.text
 
         qr_payload = forensic_report.qr_payload or (forensic_report.qr_payloads[0] if forensic_report.qr_payloads else None)
@@ -190,9 +268,9 @@ class VerificationService:
             else:
                 qr_payload = details
 
-        if not qr_payload and file_bytes:
+        if not qr_payload and (file_bytes or cv_img is not None):
             from app.services.official_registry import OfficialRegistryService
-            qr_payload = OfficialRegistryService.scan_qr_from_image(file_bytes)
+            qr_payload = OfficialRegistryService.scan_qr_from_image(cv_img if cv_img is not None else file_bytes, password=eff_password)
             if qr_payload:
                 forensic_report.qr_detected = True
                 forensic_report.qr_payload = qr_payload
@@ -859,7 +937,8 @@ class VerificationService:
                 payload=payload,
                 db=db,
                 file_bytes=file_bytes,
-                filename=filename
+                filename=filename,
+                pdf_password=getattr(payload, "pdf_password", None) if payload else None
             )
             individual_results.append(res)
 
@@ -879,14 +958,15 @@ class VerificationService:
         audit_hash = cls.calculate_sha256(f"{session_id}:{len(files)}:{overall_verdict.value}:{timestamp.isoformat()}")
 
         # Append audit block
-        await cls.append_audit_block(
-            db=db,
-            event_type="MULTI_SCREENING",
-            session_id=session_id,
-            officer_id=payload.officer_id,
-            payload_digest=audit_hash
-        )
-        await db.flush()
+        if db is not None:
+            await cls.append_audit_block(
+                db=db,
+                event_type="MULTI_SCREENING",
+                session_id=session_id,
+                officer_id=payload.officer_id,
+                payload_digest=audit_hash
+            )
+            await db.flush()
 
         return MultiVerificationResponse(
             session_id=session_id,
@@ -901,7 +981,7 @@ class VerificationService:
     @classmethod
     async def _save_session_record(
         cls,
-        db: AsyncSession,
+        db: Optional[AsyncSession],
         session_id: str,
         timestamp: datetime,
         doc_type: str,
@@ -918,6 +998,8 @@ class VerificationService:
         evidence_items: List[EvidenceItem]
     ):
         """Persist session and audit block to SQLite."""
+        if db is None:
+            return
         db_session = VerificationSessionModel(
             id=session_id,
             created_at=timestamp,

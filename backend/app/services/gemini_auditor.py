@@ -89,10 +89,11 @@ class GeminiAuditorService:
                 if is_pdf:
                     try:
                         import fitz
-                        doc = fitz.open(stream=file_bytes, filetype="pdf")
-                        if len(doc) > 0:
+                        from app.services.quality_assessor import DocumentQualityAssessor
+                        doc, _ = DocumentQualityAssessor.open_pdf_doc(file_bytes, filename=filename)
+                        if doc and len(doc) > 0:
                             page = doc[0]
-                            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5))
                             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                     except Exception as e_pdf:
                         logger.debug(f"PyMuPDF PDF rendering error: {e_pdf}")

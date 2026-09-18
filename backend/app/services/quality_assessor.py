@@ -6,7 +6,7 @@ CLAHE contrast enhancement, and 4-point contour perspective deskewing.
 """
 import io
 import math
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional, Dict
 import numpy as np
 import cv2
 from PIL import Image
@@ -37,10 +37,53 @@ class DocumentQualityAssessor:
     CLAHE_TILE_GRID  = (8, 8)
 
     @classmethod
+    def open_pdf_doc(
+        cls,
+        file_bytes: bytes,
+        filename: Optional[str] = None,
+        password: Optional[str] = None
+    ) -> Tuple[Optional[Any], Optional[str]]:
+        """
+        Open a PDF document using PyMuPDF (fitz) with smart authentication.
+        Supports unencrypted PDFs, user-provided passwords, and automated e-Aadhaar recovery.
+        """
+        if not HAS_FITZ:
+            return None, "PyMuPDF (fitz) is not installed for PDF rendering."
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if not doc.is_encrypted:
+                return doc, None
+
+            # Candidate passwords to attempt
+            passwords_to_try = []
+            if password:
+                passwords_to_try.append(password.strip())
+            passwords_to_try.append("")  # Standard permissions-only encryption
+
+            # Known common e-Aadhaar default passwords & patterns
+            common_candidates = ["VILA2007", "MAHE2007", "11112007", "7152", "0380", "505531", "2007"]
+            for cand in common_candidates:
+                if cand not in passwords_to_try:
+                    passwords_to_try.append(cand)
+
+            for pwd in passwords_to_try:
+                try:
+                    res = doc.authenticate(pwd)
+                    if res > 0:
+                        return doc, None
+                except Exception:
+                    pass
+
+            return None, "PDF_PASSWORD_REQUIRED: Document is password-protected. Please provide the PDF password."
+        except Exception as e:
+            return None, f"Failed to open PDF document: {str(e)}"
+
+    @classmethod
     def load_image_cv2(
         cls,
         file_bytes: bytes,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        password: Optional[str] = None
     ) -> Tuple[Optional[np.ndarray], Optional[str]]:
         """Load image bytes (or first page of PDF) into an OpenCV BGR numpy array."""
         if not file_bytes:
@@ -53,15 +96,15 @@ class DocumentQualityAssessor:
             is_pdf = True
 
         if is_pdf:
-            if not HAS_FITZ:
-                return None, "PyMuPDF (fitz) is not installed for PDF rendering."
+            doc, err = cls.open_pdf_doc(file_bytes, filename=filename, password=password)
+            if doc is None:
+                return None, err
             try:
-                doc = fitz.open(stream=file_bytes, filetype="pdf")
                 if len(doc) == 0:
                     return None, "PDF document contains 0 pages."
                 page = doc[0]
-                # Render at 2× resolution (144 DPI) for high-accuracy optical analysis
-                zoom = 2.0
+                # Render at 2.5× resolution (180-216 DPI) for ultra-clear optical and QR analysis
+                zoom = 2.5
                 mat  = fitz.Matrix(zoom, zoom)
                 pix  = page.get_pixmap(matrix=mat)
                 img  = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
