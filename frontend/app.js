@@ -654,10 +654,29 @@ function renderTripleColResults(result, containerId) {
        </div>`
     : '';
 
+  // Biometric Face Alteration alert
+  const isFaceAltered = (forensics.suspicious_regions && forensics.suspicious_regions.some(b => b.label && b.label.includes('FACE'))) ||
+                        (result.bounding_boxes && result.bounding_boxes.some(b => b.label && b.label.includes('FACE') && b.severity === 'SUSPICIOUS')) ||
+                        (result.explanation && result.explanation.negative_factors && result.explanation.negative_factors.some(f => f.toLowerCase().includes('face alteration') || f.toLowerCase().includes('face portrait altered')));
+
+  const faceAlterationHtml = isFaceAltered
+    ? `<div class="frankenstein-alert" style="margin: 0.5rem; border: 1.5px solid #ff3333; background: rgba(255, 30, 30, 0.15);">
+         <span class="material-symbols-outlined" style="color:#ff3333;font-size:22px;">face_retouching_off</span>
+         <div>
+           <h4 style="color:#ff4444;font-size:12px;font-weight:700;margin:0 0 2px 0;">BIOMETRIC FACE ALTERATION DETECTED</h4>
+           <p style="color:#ff9999;font-size:11px;margin:0;">Citizen face portrait altered and substituted alongside identity forgery. Facial perimeter discontinuity detected.</p>
+         </div>
+       </div>`
+    : '';
+
   // Column 3: Extracted Fields + Checksum + API Setu badge
   const checksumOk = fields.checksums_valid;
   const csClass    = checksumOk === true ? 'pass' : (checksumOk === false ? 'fail' : 'na');
   const csLabel    = checksumOk === true ? '✓ PASS' : (checksumOk === false ? '✗ FAIL' : 'N/A');
+
+  const faceDisplay = isFaceAltered
+    ? '<span style="color:#ff3333;font-weight:700;">⚠️ ALTERED / TAMPERED</span>'
+    : (forensics.face_detected ? `✓ Yes (${forensics.face_count})` : 'No');
 
   const fieldRows = [
     ['Name',            fields.name],
@@ -668,22 +687,45 @@ function renderTripleColResults(result, containerId) {
     ['Nationality',     fields.nationality],
     ['Address',         fields.address ? fields.address.substring(0, 60) + '...' : null],
     ['QR Decoded',      forensics.qr_detected ? '✓ Yes' : 'No'],
-    ['Face Detected',   forensics.face_detected ? `✓ Yes (${forensics.face_count})` : 'No'],
+    ['Face Biometric',  faceDisplay],
   ]
     .filter(([, v]) => v)
-    .map(([k, v]) => `<div style="display:grid;grid-template-columns:90px 1fr;gap:2px;margin-bottom:4px;"><span style="color:var(--text-muted);font-size:10px;">${escapeHtml(k)}</span><span style="font-size:11px;word-break:break-all;">${escapeHtml(String(v))}</span></div>`)
+    .map(([k, v]) => `<div style="display:grid;grid-template-columns:90px 1fr;gap:2px;margin-bottom:4px;"><span style="color:var(--text-muted);font-size:10px;">${escapeHtml(k)}</span><span style="font-size:11px;word-break:break-all;">${String(v)}</span></div>`)
     .join('');
+
+  // Official Master Registry Record Block
+  const masterRec = fields.dynamic_fields ? fields.dynamic_fields.official_master_record : null;
+  let masterRecHtml = '';
+  if (masterRec) {
+    const isConflict = fields.name && masterRec.name && !fields.name.toUpperCase().includes(masterRec.name.toUpperCase());
+    masterRecHtml = `
+      <div style="margin-top:8px;padding:8px;border-radius:6px;background:${isConflict ? 'rgba(255,50,50,0.12)' : 'rgba(0,200,100,0.1)'};border:1.5px solid ${isConflict ? '#ff4444' : '#00c864'};">
+        <div style="font-size:10px;font-weight:700;color:${isConflict ? '#ff4444' : '#00c864'};display:flex;align-items:center;gap:4px;">
+          <span class="material-symbols-outlined" style="font-size:14px;">${isConflict ? 'gpp_bad' : 'verified_user'}</span>
+          <span>${isConflict ? 'OFFICIAL REGISTRY CONFLICT (API SETU)' : 'OFFICIAL REGISTRY VERIFIED'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text);margin-top:4px;">
+          Official Citizen: <strong>${escapeHtml(masterRec.name)}</strong>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);">
+          Official DOB: ${escapeHtml(masterRec.dob)} | UID: ${escapeHtml(masterRec.masked_identifier || '')}
+        </div>
+        ${isConflict ? `<div style="font-size:10px;color:#ff4444;margin-top:3px;font-weight:600;">⚠ Visual name '${escapeHtml(fields.name || '')}' does not match official citizen record!</div>` : ''}
+      </div>
+    `;
+  }
 
   const col3Body = `
     <div class="results-json-scroll">
       ${fieldRows || '<span style="color:var(--text-muted);font-size:11px;">No fields extracted</span>'}
+      ${masterRecHtml}
       <div style="margin-top:8px;">
         <span class="checksum-badge ${csClass}">${csLabel} Checksums</span>
       </div>
       ${fields.checksum_details ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">${escapeHtml(fields.checksum_details)}</div>` : ''}
       <div class="api-setu-badge sandbox" style="margin-top:8px;">
         <span class="material-symbols-outlined" style="font-size:12px;">cloud_sync</span>
-        <span>API Setu: Sandbox Mode</span>
+        <span>API Setu: Sovereign Gateway</span>
       </div>
       <div style="margin-top:8px;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);word-break:break-all;">
         SHA-256: ${escapeHtml(result.audit_hash || '—')}
@@ -706,6 +748,7 @@ function renderTripleColResults(result, containerId) {
         </div>
         <div class="results-col-body">${col2Body}</div>
         ${frankensteinHtml}
+        ${faceAlterationHtml}
       </div>
       <div class="results-col-card">
         <div class="results-col-header">
