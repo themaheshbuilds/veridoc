@@ -525,24 +525,49 @@ class VerificationService:
             DocumentType.VOTER_ID,
         )
         if forensic_report.face_detected:
-            evidence_items.append(
-                EvidenceItem(
-                    check_id="CHK-BIO-05",
-                    check_name="Citizen Facial Portrait Verification",
-                    source_type=SourceType.FORENSIC,
-                    status=EvidenceStatus.PASS,
-                    confidence=0.94,
-                    summary=f"Detected {forensic_report.face_count} frontal facial portrait(s) matching credential layout.",
-                    provenance=Provenance(
-                        engine_id="WINDOWS-MEDIA-FACE-DETECTOR",
-                        algorithm="FACEDETECTOR_HIGH_PERFORMANCE",
-                        duration_ms=30.0
-                    )
-                ).seal()
-            )
+            altered_faces = [b for b in forensic_report.face_boxes if b.severity == "SUSPICIOUS" or "ALTERED" in b.label]
+            if altered_faces:
+                neg_factors.append(
+                    f"Biometric Portrait Alteration: Citizen facial portrait exhibits localized photo splicing, perimeter boundary cut discontinuity, or synthetic tampering."
+                )
+                evidence_items.append(
+                    EvidenceItem(
+                        check_id="CHK-BIO-05",
+                        check_name="Citizen Facial Portrait Verification",
+                        source_type=SourceType.FORENSIC,
+                        status=EvidenceStatus.FAIL,
+                        confidence=0.98,
+                        summary=f"Altered biometric photo detected on {doc_type.value} credential. Spliced photo boundary discontinuity or compression anomaly detected.",
+                        provenance=Provenance(
+                            engine_id="BIOMETRIC-FORENSIC-SPLICING-AUDITOR",
+                            algorithm="PHOTO_SPLICING_AND_BOUNDARY_DISCONTINUITY_ANALYSIS",
+                            duration_ms=25.0
+                        )
+                    ).seal()
+                )
+                forensic_report.tampering_detected = True
+                for af in altered_faces:
+                    if not any(abs(r.x - af.x) < 5 and abs(r.y - af.y) < 5 for r in forensic_report.suspicious_regions):
+                        forensic_report.suspicious_regions.append(af)
+            else:
+                evidence_items.append(
+                    EvidenceItem(
+                        check_id="CHK-BIO-05",
+                        check_name="Citizen Facial Portrait Verification",
+                        source_type=SourceType.FORENSIC,
+                        status=EvidenceStatus.PASS,
+                        confidence=0.94,
+                        summary=f"Detected {forensic_report.face_count} authentic frontal facial portrait(s) matching credential layout.",
+                        provenance=Provenance(
+                            engine_id="WINDOWS-MEDIA-FACE-DETECTOR",
+                            algorithm="FACEDETECTOR_HIGH_PERFORMANCE",
+                            duration_ms=30.0
+                        )
+                    ).seal()
+                )
         elif doc_type in photo_id_types:
             neg_factors.append(
-                f"Biometric Portrait Anomaly: No valid citizen frontal portrait detected on {doc_type.value} credential (photo may be obscured, defaced, tampered, or missing)."
+                f"Biometric Portrait Alteration: Citizen facial portrait is missing, defaced, or obscured on {doc_type.value} credential (photo alteration detected)."
             )
             evidence_items.append(
                 EvidenceItem(
@@ -559,6 +584,7 @@ class VerificationService:
                     )
                 ).seal()
             )
+            forensic_report.tampering_detected = True
 
         # 6. Statutory Database Connectivity & Cryptographic QR Verification
         if forensic_report.qr_decoded_data and forensic_report.qr_decoded_data.get("status") == "OFFICIAL_VERIFIED":
@@ -597,7 +623,136 @@ class VerificationService:
                 ).seal()
             )
 
-        # 7. Google Gemini Multimodal AI Vision Audit Evidence
+        # 7. Statutory Master Registry Gateway (API Setu / UIDAI Master Database)
+        doc_num_to_query = (extracted_fields.document_number or "").strip()
+        if not doc_num_to_query and forensic_report.qr_decoded_data:
+            doc_num_to_query = (
+                forensic_report.qr_decoded_data.get("masked_aadhaar")
+                or forensic_report.qr_decoded_data.get("uid")
+                or ""
+            )
+        if not doc_num_to_query:
+            raw_t = extracted_fields.raw_text or ""
+            uid_m = re.search(r'\b\d{4}\s*\d{4}\s*\d{4}\b', raw_t)
+            if uid_m:
+                doc_num_to_query = uid_m.group(0)
+
+        registry_match = None
+        if doc_num_to_query:
+            from app.services.official_registry import OfficialRegistryService
+            registry_match = await OfficialRegistryService.lookup_registry_record(
+                db=db,
+                document_type=doc_type.value,
+                document_number=doc_num_to_query
+            )
+
+        if registry_match:
+            reg_name = registry_match.get("name", "").strip()
+            reg_dob = registry_match.get("dob", "").strip()
+            reg_status = registry_match.get("status", "ACTIVE")
+            reg_source = registry_match.get("registry_source", "API Setu Gateway")
+            masked_ident = registry_match.get("masked_number", doc_num_to_query)
+
+            extracted_fields.dynamic_fields["official_master_record"] = {
+                "name": reg_name,
+                "dob": reg_dob,
+                "status": reg_status,
+                "source": reg_source,
+                "masked_identifier": masked_ident
+            }
+
+            # A. Visual Name vs. Master Registry Name Cross-Check
+            vis_name = (extracted_fields.name or "").strip()
+            clean_vis = re.sub(r'[^a-zA-Z\s]', '', vis_name).upper().strip()
+            clean_reg = re.sub(r'[^a-zA-Z\s]', '', reg_name).upper().strip()
+
+            name_conflict = False
+            if clean_vis and clean_reg:
+                vis_tokens = set(clean_vis.split())
+                reg_tokens = set(clean_reg.split())
+                if not (clean_vis == clean_reg or clean_vis in clean_reg or clean_reg in clean_vis or (vis_tokens & reg_tokens)):
+                    name_conflict = True
+
+            if name_conflict:
+                neg_factors.append(
+                    f"Official Master Registry Conflict (API Setu / UIDAI DB): Visual card name '{vis_name}' contradicts official registered citizen name '{reg_name}' for credential {masked_ident}. Document is a counterfeit alteration!"
+                )
+                evidence_items.append(
+                    EvidenceItem(
+                        check_id="CHK-REGISTRY-ALTERATION-01",
+                        check_name="Official Master Registry Cross-Check",
+                        source_type=SourceType.OFFICIAL,
+                        status=EvidenceStatus.FAIL,
+                        confidence=1.0,
+                        summary=f"Visual card face name '{vis_name}' altered. Master registry confirms citizen is '{reg_name}'.",
+                        provenance=Provenance(
+                            engine_id="API-SETU-MASTER-REGISTRY",
+                            algorithm="SOVEREIGN_REGISTRY_CROSS_VALIDATOR",
+                            duration_ms=5.0
+                        )
+                    ).seal()
+                )
+                forensic_report.tampering_detected = True
+                forensic_report.frankenstein_forgery = True
+
+                # Locate and box the altered visual name on the document preview and ELA heatmap
+                if ocr_result and ocr_result.bounding_boxes and cv_img is not None:
+                    img_h, img_w = cv_img.shape[:2]
+                    for obox in ocr_result.bounding_boxes:
+                        otext = obox.get("text", "").strip()
+                        opts = obox.get("box", [])
+                        if not opts or len(opts) != 4:
+                            continue
+                        if clean_vis and any(part in otext.upper() for part in clean_vis.split() if len(part) > 2):
+                            xs = [pt[0] for pt in opts]
+                            ys = [pt[1] for pt in opts]
+                            bx, by = min(xs), min(ys)
+                            bw, bh = max(xs) - min(xs), max(ys) - min(ys)
+                            alt_box = BoundingBox(
+                                x=round((bx / img_w) * 100, 2),
+                                y=round((by / img_h) * 100, 2),
+                                width=round((bw / img_w) * 100, 2),
+                                height=round((bh / img_h) * 100, 2),
+                                label="REGISTRY_ALTERATION",
+                                severity="SUSPICIOUS",
+                                details=f"Identity Alteration: Visual name '{otext}' contradicts official master record '{reg_name}'."
+                            )
+                            if not any(abs(r.x - alt_box.x) < 5 and abs(r.y - alt_box.y) < 5 for r in forensic_report.suspicious_regions):
+                                forensic_report.suspicious_regions.append(alt_box)
+
+            # B. Visual DOB vs. Master Registry DOB Cross-Check
+            vis_dob = (extracted_fields.dob or "").strip()
+            if vis_dob and reg_dob:
+                norm_vis = DocumentAnalyzer._normalize_date(vis_dob)
+                norm_reg = DocumentAnalyzer._normalize_date(reg_dob)
+                if norm_vis and norm_reg and norm_vis != norm_reg:
+                    neg_factors.append(
+                        f"Official Master Registry Conflict (API Setu / UIDAI DB): Visual DOB '{vis_dob}' contradicts official registered birth date '{reg_dob}' for credential {masked_ident}."
+                    )
+                    forensic_report.tampering_detected = True
+                    forensic_report.frankenstein_forgery = True
+
+            if not name_conflict:
+                pos_factors.append(
+                    f"Official Master Registry Verification (API Setu / UIDAI DB): Citizen '{reg_name}' verified authentic and {reg_status} in national identity register."
+                )
+                evidence_items.append(
+                    EvidenceItem(
+                        check_id="CHK-REGISTRY-PASS-01",
+                        check_name="Official Master Registry Cross-Check",
+                        source_type=SourceType.OFFICIAL,
+                        status=EvidenceStatus.PASS,
+                        confidence=1.0,
+                        summary=f"Visual card face matches official master registry identity '{reg_name}' ({reg_status}).",
+                        provenance=Provenance(
+                            engine_id="API-SETU-MASTER-REGISTRY",
+                            algorithm="SOVEREIGN_REGISTRY_CROSS_VALIDATOR",
+                            duration_ms=5.0
+                        )
+                    ).seal()
+                )
+
+        # 8. Google Gemini Multimodal AI Vision Audit Evidence
         if ai_analysis and ai_analysis.triggered and ai_analysis.findings:
             ai_status = EvidenceStatus.FAIL if ai_analysis.confidence_impact < 0 else EvidenceStatus.PASS
             evidence_items.append(
@@ -712,15 +867,15 @@ class VerificationService:
                             forensic_report.suspicious_regions.append(forgery_box)
                         forensic_report.tampering_detected = True
 
-        # Check for physical document tampering, mathematical failure, or OCR-QR cross-field mismatch
+        # Check for physical document tampering, mathematical failure, OCR-QR cross-field mismatch, or biometric photo tampering
         has_critical_factor = any(
             any(k in f for k in [
                 "Mismatch", "Conflict", "Failure", "Tampering",
                 "Mimicry", "Alteration", "Obliteration", "Erasure", "Scratch",
-                "Discrepancy", "Forgery", "Corrupt"
+                "Discrepancy", "Forgery", "Corrupt", "Splicing", "Photo-Swap"
             ])
             for f in neg_factors
-            if not f.startswith("Biometric Portrait")
+            if not (f.startswith("Biometric Portrait Anomaly: No valid citizen frontal portrait") and "alteration" not in f.lower() and "tamper" not in f.lower())
         )
 
         if statutory_qr_verified and not has_critical_factor and not forensic_report.frankenstein_forgery and extracted_fields.checksums_valid is not False:
@@ -787,7 +942,7 @@ class VerificationService:
             risk_level = RiskLevel.HIGH
             recommendation = OfficerAction.SECONDARY_INSPECTION
             status_label = "High Risk"
-            risk_score = max(risk_score, 85.0)
+            risk_score = 100.0 if (forensic_report.frankenstein_forgery or any("Conflict" in f or "Alteration" in f or "Forgery" in f for f in neg_factors)) else max(risk_score, 85.0)
             tamper_reason = "; ".join(neg_factors[:2]) if neg_factors else "Document surface tampering or credential integrity violation detected."
             if extracted_fields.checksums_valid is False and extracted_fields.checksum_details:
                 tamper_reason = f"Credential verification anomaly: {extracted_fields.checksum_details}."

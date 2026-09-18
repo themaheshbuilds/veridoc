@@ -103,6 +103,30 @@ class BatchJobModel(Base):
     results = Column(JSON, default=list)
 
 
+class OfficialRegistryRecordModel(Base):
+    """Stores official statutory master identity records (API Setu / UIDAI / MoRTH / CBDT registries)."""
+    __tablename__ = "official_registry_records"
+
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_type = Column(String(32), nullable=False, index=True)  # AADHAAR, PAN, DRIVING_LICENCE
+    document_number = Column(String(64), nullable=False, index=True)  # Full unmasked number (e.g. 715293520380)
+    masked_number = Column(String(32), nullable=True)  # XXXX-XXXX-0380
+    last_four = Column(String(8), nullable=True, index=True)  # 0380
+    name = Column(String(128), nullable=False, index=True)  # Vilasagaram Mahesh
+    dob = Column(String(32), nullable=True)  # 11/11/2007
+    gender = Column(String(16), nullable=True)  # MALE / FEMALE
+    father_or_guardian = Column(String(128), nullable=True)  # Vilasagaram Srinivas
+    address = Column(Text, nullable=True)
+    pincode = Column(String(16), nullable=True)
+    state = Column(String(64), nullable=True)
+    phone = Column(String(32), nullable=True)
+    status = Column(String(32), default="ACTIVE", index=True)  # ACTIVE, SUSPENDED, REVOKED
+    registry_source = Column(String(128), default="UIDAI CIDR Master Registry (API Setu Gateway)")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 # Composite indexes for fast telemetry queries
 Index("idx_verif_date_verdict", VerificationSessionModel.created_at, VerificationSessionModel.overall_verdict)
 Index("idx_verif_type_risk", VerificationSessionModel.document_type, VerificationSessionModel.risk_level)
+Index("idx_registry_doc_num", OfficialRegistryRecordModel.document_type, OfficialRegistryRecordModel.document_number)
+

@@ -47,11 +47,21 @@ class ForensicAnalyzer:
         else:
             findings.append(f"ELA Forensics: Uniform compression surface. Zero significant quantization anomalies ({ela_score*100:.1f}%).")
 
-        # 2. Face / Photo Detection (Haar Cascades)
+        # 2. Face / Photo Detection & Biometric Tamper Analysis
         face_boxes = cls._detect_faces(cv_img)
         face_detected = len(face_boxes) > 0
-        if face_detected:
-            findings.append(f"Biometric Portrait: Detected {len(face_boxes)} facial portrait(s) matching canonical ID layout.")
+
+        if face_detected and cv_img is not None:
+            face_boxes, face_tamper_boxes = cls._inspect_face_tampering(cv_img, face_boxes)
+            if face_tamper_boxes:
+                tampering_detected = True
+                suspicious_boxes.extend(face_tamper_boxes)
+                findings.append(
+                    f"Biometric Portrait Alteration: Detected {len(face_tamper_boxes)} altered/spliced facial portrait(s) "
+                    f"with perimeter boundary cuts, texture anomalies, or synthetic tampering."
+                )
+            else:
+                findings.append(f"Biometric Portrait: Detected {len(face_boxes)} authentic facial portrait(s) matching canonical ID layout.")
         else:
             findings.append("Biometric Portrait: No standard frontal face detected (document may be back side, certificate, or text-only ID).")
 
@@ -455,6 +465,93 @@ class ForensicAnalyzer:
             pass
 
         return []
+
+    @classmethod
+    def _inspect_face_tampering(
+        cls, cv_img: np.ndarray, face_boxes: List[BoundingBox]
+    ) -> Tuple[List[BoundingBox], List[BoundingBox]]:
+        """
+        Analyze citizen biometric facial portraits for physical photo-swapping,
+        digital splicing, perimeter boundary cuts, artificial blurring, and texture tampering.
+        Returns:
+            (updated_face_boxes, suspicious_face_boxes)
+        """
+        if cv_img is None or not face_boxes:
+            return face_boxes, []
+
+        h, w = cv_img.shape[:2]
+        updated_boxes: List[BoundingBox] = []
+        suspicious_boxes: List[BoundingBox] = []
+
+        gray_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+        doc_sharpness = float(cv2.Laplacian(gray_img, cv2.CV_64F).var())
+
+        for box in face_boxes:
+            bx = max(0, int((box.x / 100.0) * w))
+            by = max(0, int((box.y / 100.0) * h))
+            bw = min(w - bx, int((box.width / 100.0) * w))
+            bh = min(h - by, int((box.height / 100.0) * h))
+
+            if bw < 30 or bh < 30:
+                updated_boxes.append(box)
+                continue
+
+            face_crop = cv_img[by:by+bh, bx:bx+bw]
+            face_gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+
+            is_altered = False
+            reasons = []
+
+            # 1. Step-Function Perimeter Boundary Gradient (Photo Splicing / Cut-and-Paste Border)
+            pad = 6
+            bx1, by1 = max(0, bx - pad), max(0, by - pad)
+            bx2, by2 = min(w, bx + bw + pad), min(h, by + bh + pad)
+            if (bx2 - bx1) > bw and (by2 - by1) > bh:
+                perimeter_crop = gray_img[by1:by2, bx1:bx2]
+                sobelx = cv2.Sobel(perimeter_crop, cv2.CV_64F, 1, 0, ksize=3)
+                sobely = cv2.Sobel(perimeter_crop, cv2.CV_64F, 0, 1, ksize=3)
+                grad_mag = np.sqrt(sobelx**2 + sobely**2)
+
+                border_mask = np.ones_like(perimeter_crop, dtype=bool)
+                border_mask[pad:-pad, pad:-pad] = False
+                border_grad = float(np.mean(grad_mag[border_mask]))
+                interior_grad = float(np.mean(grad_mag[~border_mask]))
+
+                if border_grad > 48.0 and border_grad > (interior_grad * 1.7):
+                    is_altered = True
+                    reasons.append(f"Boundary cut discontinuity: perimeter edge gradient {border_grad:.1f} indicates spliced photo frame")
+
+            # 2. Texture & Artificial Smoothing / Blur Check
+            face_sharpness = float(cv2.Laplacian(face_gray, cv2.CV_64F).var())
+            if doc_sharpness > 80.0 and face_sharpness < 22.0:
+                is_altered = True
+                reasons.append(f"Texture anomaly: artificial face blurring/smudging (sharpness: {face_sharpness:.1f} vs card {doc_sharpness:.1f})")
+            elif face_sharpness > (doc_sharpness * 3.2) and face_sharpness > 550.0:
+                is_altered = True
+                reasons.append(f"High-frequency synthetic noise: face sharpness {face_sharpness:.1f} diverges from card {doc_sharpness:.1f}")
+
+            # 3. Obliterated / Uniform Color Patch (Erase / Whiteout)
+            face_std = float(np.std(face_gray))
+            if face_std < 12.0:
+                is_altered = True
+                reasons.append("Obliterated portrait: solid or near-uniform color patch detected in face frame")
+
+            if is_altered:
+                suspicious_box = BoundingBox(
+                    x=box.x,
+                    y=box.y,
+                    width=box.width,
+                    height=box.height,
+                    label="ALTERED_FACE_PORTRAIT",
+                    severity="SUSPICIOUS",
+                    details="; ".join(reasons)
+                )
+                updated_boxes.append(suspicious_box)
+                suspicious_boxes.append(suspicious_box)
+            else:
+                updated_boxes.append(box)
+
+        return updated_boxes, suspicious_boxes
 
     @classmethod
     def _detect_barcodes_and_qr(
