@@ -3,8 +3,13 @@ import json
 import time
 import uuid
 import re
+import base64
+import logging
+import numpy as np
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
