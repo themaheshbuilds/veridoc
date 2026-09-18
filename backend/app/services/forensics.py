@@ -160,19 +160,31 @@ class ForensicAnalyzer:
             diff_np = np.array(diff)
             gray_diff = cv2.cvtColor(diff_np, cv2.COLOR_RGB2GRAY)
 
+            # Dynamic range contrast stretching for forensic thermal visualization
+            max_diff = float(np.max(gray_diff))
+            # Scale dynamically so subtle quantization variations and digital edits populate the full spectrum
+            scale_factor = min(255.0 / max(max_diff, 1.0), 30.0) if max_diff > 0 else 15.0
+            stretched = cv2.convertScaleAbs(gray_diff, alpha=scale_factor)
+
+            # Local Laplacian noise texture to detect digital font splicing and smooth paste patches
+            gray_orig = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+            laplacian = cv2.Laplacian(gray_orig, cv2.CV_64F)
+            lap_abs = np.clip(np.abs(laplacian) * 1.2, 0, 255).astype(np.uint8)
+
+            # Multi-spectral forensic fusion: 70% DCT quantization error + 30% local noise disparity
+            fused_error = cv2.addWeighted(stretched, 0.70, lap_abs, 0.30, 0)
+
             # Measure baseline compression error across non-background features
-            non_bg = gray_diff[gray_diff > 4]
-            baseline_mean = float(np.mean(non_bg)) if len(non_bg) > 0 else 5.0
-            baseline_std = float(np.std(non_bg)) if len(non_bg) > 0 else 4.0
+            mean_val, std_val = cv2.meanStdDev(fused_error)
+            baseline_mean = float(mean_val[0][0])
+            baseline_std = float(std_val[0][0])
 
-            # Amplify difference to visualize subtle compression discrepancies
-            amplified = cv2.multiply(gray_diff, 10)
+            # Anomaly threshold: regions whose error density significantly departs from document baseline
+            thresh_limit = min(max(int(baseline_mean + 1.4 * baseline_std), 60), 180)
+            _, thresh = cv2.threshold(fused_error, thresh_limit, 255, cv2.THRESH_BINARY)
 
-            # Threshold for high-anomaly pixels
-            _, thresh = cv2.threshold(amplified, cls.ELA_DIFF_THRESHOLD, 255, cv2.THRESH_BINARY)
-
-            # Filter small noise clusters via morphological operations
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+            # Compact morphological kernel (3x3) to preserve micro-text, digits, and thin boundary cuts
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
             cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
             dilated = cv2.dilate(cleaned, kernel, iterations=2)
 
@@ -187,53 +199,50 @@ class ForensicAnalyzer:
 
             for cnt in contours:
                 area = cv2.contourArea(cnt)
-                # Only consider distinct clusters with meaningful area, ignoring regular text lines and microscopic specks
-                if cls.ANOMALY_CLUSTER_MIN_AREA < area < (total_pixels * 0.40):
-                    # Check if region's error is an extreme statistical outlier compared to document's feature baseline
-                    mask = np.zeros(gray_diff.shape, dtype=np.uint8)
-                    cv2.drawContours(mask, [cnt], -1, 255, -1)
-                    roi_mean = cv2.mean(gray_diff, mask=mask)[0]
+                # Catch localized tampering clusters: from small text edits (>50 px) to pasted patches (<35% of page)
+                if 50 < area < (total_pixels * 0.35):
+                    x, y, bw, bh = cv2.boundingRect(cnt)
+                    roi = fused_error[y:y+bh, x:x+bw]
+                    roi_mean = float(np.mean(roi))
 
-                    if roi_mean > (baseline_mean + 1.8 * baseline_std):
-                        x, y, bw, bh = cv2.boundingRect(cnt)
-                        # Convert to normalized percentage (0-100%) for responsive frontend rendering
-                        norm_x = round((x / w) * 100, 2)
-                        norm_y = round((y / h) * 100, 2)
-                        norm_w = round((bw / w) * 100, 2)
-                        norm_h = round((bh / h) * 100, 2)
-
+                    if roi_mean > (baseline_mean + 1.1 * baseline_std):
                         suspicious_boxes.append(
                             BoundingBox(
-                                x=norm_x,
-                                y=norm_y,
-                                width=norm_w,
-                                height=norm_h,
+                                x=round((x / w) * 100, 2),
+                                y=round((y / h) * 100, 2),
+                                width=round((bw / w) * 100, 2),
+                                height=round((bh / h) * 100, 2),
                                 label="SUSPICIOUS_ALTERATION",
                                 severity="SUSPICIOUS",
-                                details=f"ELA compression divergence: localized error {roi_mean:.1f} diverges from baseline {baseline_mean:.1f}."
+                                details=f"Quantization & noise divergence: localized error {roi_mean:.1f} diverges from baseline {baseline_mean:.1f}."
                             )
                         )
 
-            # Limit to top 5 most prominent regions
-            suspicious_boxes = sorted(suspicious_boxes, key=lambda b: b.width * b.height, reverse=True)[:5]
+            # Limit to top 6 most prominent anomalous clusters
+            suspicious_boxes = sorted(suspicious_boxes, key=lambda b: b.width * b.height, reverse=True)[:6]
 
-            # Generate ELA heatmap as colourised base64 PNG for frontend 3-column display
+            # Generate multi-spectral ELA thermal heatmap as colourised base64 PNG
             ela_heatmap_b64: Optional[str] = None
             try:
-                # Calibrated physical error mapping: difference 0-4 is cool blue (clean), >12 is hot red (tampered)
-                norm_diff = np.clip(cv2.multiply(gray_diff, 14), 0, 255).astype(np.uint8)
-                heatmap = cv2.applyColorMap(norm_diff, cv2.COLORMAP_JET)
-                # Blend with original for context
-                alpha = 0.60
+                # Apply high-contrast thermal colormap (JET) across fused error
+                heatmap = cv2.applyColorMap(fused_error, cv2.COLORMAP_JET)
+                # Blend with original document for operational context
+                alpha = 0.55
                 blended = cv2.addWeighted(heatmap, alpha, bgr_img, 1.0 - alpha, 0)
-                # Overlay suspicious region boxes in glowing red with high visibility
+
+                # Overlay high-visibility glowing red warning boxes and alert badges on altered regions
                 for box in suspicious_boxes:
                     bx = int(box.x / 100.0 * w)
                     by = int(box.y / 100.0 * h)
                     bw2 = int(box.width / 100.0 * w)
                     bh2 = int(box.height / 100.0 * h)
+                    # Outer red boundary
                     cv2.rectangle(blended, (bx, by), (bx + bw2, by + bh2), (0, 0, 255), 3)
-                    cv2.putText(blended, "ALTERATION", (bx, max(15, by - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    # Alert header tag
+                    tag_w = min(110, bw2 + 10)
+                    cv2.rectangle(blended, (bx, max(0, by - 18)), (bx + tag_w, by), (0, 0, 255), -1)
+                    cv2.putText(blended, "ALTERATION", (bx + 3, max(12, by - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1, cv2.LINE_AA)
+
                 _, enc_buf = cv2.imencode(".png", blended)
                 ela_heatmap_b64 = "data:image/png;base64," + base64.b64encode(enc_buf).decode("ascii")
             except Exception as e_heat:
